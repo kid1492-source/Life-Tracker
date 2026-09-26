@@ -1,5 +1,5 @@
 // Network-first: always fresh when online, cached copy when offline.
-const CACHE='life-tracker-v1';
+const CACHE='life-tracker-v2';
 const CACHEABLE=[location.origin,'https://cdn.jsdelivr.net','https://fonts.googleapis.com','https://fonts.gstatic.com'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','manifest.json','icon-192.png'])));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});

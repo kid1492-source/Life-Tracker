@@ -22,7 +22,13 @@
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 26px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.4;padding:calc(22px + env(safe-area-inset-top)) 15px calc(60px + env(safe-area-inset-bottom));}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.4;padding:calc(22px + env(safe-area-inset-top)) 15px calc(130px + env(safe-area-inset-bottom));}
+  #saveBar{position:fixed;left:0;right:0;bottom:0;z-index:50;padding:10px 15px calc(10px + env(safe-area-inset-bottom));background:rgba(38,38,36,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:1px solid var(--line);text-align:center;}
+  #saveDayBtn{display:block;width:100%;max-width:560px;margin:0 auto;background:var(--pine);border-color:var(--pine);color:#fff;font-size:15px;}
+  #saveDayBtn:active{background:#c4653f;}
+  #saveDayBtn:disabled{opacity:.6;}
+  #saveDayMsg{font-size:12px;color:var(--muted);min-height:15px;margin-top:6px;}
+  #saveDayMsg.ok{color:#8fc98f;}#saveDayMsg.err{color:#e88;}
   .wrap{max-width:560px;margin:0 auto;}
 
   .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
@@ -388,6 +394,27 @@ sb.auth.onAuthStateChange(async(ev,session)=>{
   }
 });
 window.addEventListener('online',pushDirty);
+
+// explicit per-day save: fetch the latest month from the server, replace only
+// this day, write it back — so days saved from other devices are kept.
+window.trackerSync={
+  signedIn:()=>!!user,
+  async saveDay(k,d,dayData,review){
+    if(!user)throw new Error('Not signed in — saved on this device only');
+    const mk=k.slice(PREFIX.length);
+    const {data:row,error:e1}=await sb.from('tracker_months').select('data').eq('month_key',mk).maybeSingle();
+    if(e1)throw e1;
+    const merged=Object.assign({days:{},review:{}},row&&row.data);
+    if(!merged.days)merged.days={};
+    merged.days[d]=dayData;merged.review=review;
+    const now=new Date();
+    const {error:e2}=await sb.from('tracker_months').upsert({user_id:user.id,month_key:mk,data:merged,updated_at:now.toISOString()},{onConflict:'user_id,month_key'});
+    if(e2)throw e2;
+    ls.set(k,JSON.stringify(merged));ls.set('meta:'+k,String(now.getTime()));
+    setDirty(dirty().filter(x=>x!==k));
+    return merged;
+  }
+};
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
@@ -581,6 +608,32 @@ function render(){
     bEl.style.width=pct+'%';bEl.style.background=t.hue==='amber'?'var(--amber)':'var(--pine)';});
   renderReview();
 }
+// save-day bar pinned to the bottom of the screen
+const saveBar=document.createElement('div');
+saveBar.id='saveBar';
+saveBar.innerHTML='<button id="saveDayBtn" class="navbtn"></button><div id="saveDayMsg"></div>';
+document.body.appendChild(saveBar);
+const saveBtn=document.getElementById('saveDayBtn'),saveMsg=document.getElementById('saveDayMsg');
+let shownDay='';
+function updateSaveBar(){
+  const dt=new Date(year,month0,sel);
+  if(shownDay!==storeKey()+sel){shownDay=storeKey()+sel;saveMsg.className='';saveMsg.textContent='';}
+  saveBtn.textContent='Save '+DOW[dt.getDay()]+' '+sel+' '+MONTHS[month0].slice(0,3);
+}
+const baseRender=render;
+render=function(){baseRender();updateSaveBar();};
+saveBtn.onclick=async()=>{
+  saveBtn.disabled=true;saveMsg.className='';saveMsg.textContent='Saving…';
+  try{
+    await flush();
+    const merged=await window.trackerSync.saveDay(storeKey(),sel,dayObj(sel),review);
+    days=merged.days;render();
+    saveMsg.className='ok';
+    saveMsg.textContent='✓ Saved to cloud at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(e){saveMsg.className='err';saveMsg.textContent='✗ '+e.message;}
+  saveBtn.disabled=false;
+};
+
 loadMonth();
 
 // debug panel
