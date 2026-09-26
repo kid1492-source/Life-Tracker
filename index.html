@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#262624">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Life Tracker · 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +22,7 @@
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 26px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.4;padding:22px 15px 60px;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.4;padding:calc(22px + env(safe-area-inset-top)) 15px calc(60px + env(safe-area-inset-bottom));}
   .wrap{max-width:560px;margin:0 auto;}
 
   .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
@@ -340,14 +348,33 @@ window.storage={
 const bar=document.createElement('div');
 bar.style.cssText='max-width:560px;margin:10px auto 0;padding:10px 14px;font:13px Inter,system-ui,sans-serif;color:#aaa;display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
 function status(t){const s=bar.querySelector('.sb-status');if(s)s.textContent=t;}
+const INP='flex:1;min-width:140px;padding:8px 10px;border-radius:8px;border:1px solid #444;background:#1c1c1a;color:#eee;font:inherit;';
+const BTN='background:#333;border:1px solid #555;color:#eee;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;';
+const LINK='background:none;border:none;color:#9B978C;text-decoration:underline;cursor:pointer;padding:0;font:inherit;';
 function renderBar(){
-  if(user){bar.innerHTML='<span class="sb-status">Synced ✓ '+user.email+'</span><button class="sb-out" style="margin-left:auto;background:none;border:1px solid #444;color:#aaa;border-radius:8px;padding:4px 10px;cursor:pointer;">Sign out</button>';
-    bar.querySelector('.sb-out').onclick=()=>sb.auth.signOut();}
-  else{bar.innerHTML='<span class="sb-status">Not synced (saved on this device only).</span><input type="email" placeholder="you@email.com" style="flex:1;min-width:160px;padding:6px 10px;border-radius:8px;border:1px solid #444;background:#1c1c1a;color:#eee;"><button style="background:#333;border:1px solid #555;color:#eee;border-radius:8px;padding:6px 12px;cursor:pointer;">Email me a sign-in link</button>';
-    const inp=bar.querySelector('input');
-    bar.querySelector('button').onclick=async()=>{
-      const email=inp.value.trim();if(!email)return;
-      const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+  if(user){bar.innerHTML='<span class="sb-status">Synced ✓ '+user.email+'</span><span style="margin-left:auto;display:flex;gap:12px;"><button class="sb-pw" style="'+LINK+'">Set password</button><button class="sb-out" style="'+LINK+'">Sign out</button></span>';
+    bar.querySelector('.sb-out').onclick=()=>sb.auth.signOut();
+    bar.querySelector('.sb-pw').onclick=async()=>{
+      const pw=prompt('New password (at least 6 characters):');if(!pw)return;
+      const {error}=await sb.auth.updateUser({password:pw});
+      status(error?'Error: '+error.message:'Password set ✓ — use it to sign in on any device.');};}
+  else{bar.innerHTML='<span class="sb-status" style="width:100%;">Not synced (saved on this device only). Sign in:</span>'
+      +'<input class="sb-email" type="email" autocomplete="username" placeholder="you@email.com" style="'+INP+'">'
+      +'<input class="sb-pass" type="password" autocomplete="current-password" placeholder="password" style="'+INP+'">'
+      +'<button class="sb-in" style="'+BTN+'">Sign in</button>'
+      +'<button class="sb-link" style="'+LINK+'">No password yet? Email me a sign-in link</button>';
+    const em=bar.querySelector('.sb-email'),pw=bar.querySelector('.sb-pass');
+    em.value=ls.get('meta:email')||'';
+    const email=()=>{const v=em.value.trim();ls.set('meta:email',v);return v;};
+    bar.querySelector('.sb-in').onclick=async()=>{
+      if(!email()||!pw.value)return status('Enter email and password.');
+      status('Signing in…');
+      const {error}=await sb.auth.signInWithPassword({email:email(),password:pw.value});
+      if(error)status('Error: '+error.message);};
+    pw.onkeydown=e=>{if(e.key==='Enter')bar.querySelector('.sb-in').click();};
+    bar.querySelector('.sb-link').onclick=async()=>{
+      if(!email())return status('Enter your email first.');
+      const {error}=await sb.auth.signInWithOtp({email:email(),options:{emailRedirectTo:location.origin+location.pathname}});
       status(error?'Error: '+error.message:'Check your email for the sign-in link.');};}
 }
 document.addEventListener('DOMContentLoaded',()=>{document.body.prepend(bar);renderBar();});
@@ -361,6 +388,7 @@ sb.auth.onAuthStateChange(async(ev,session)=>{
   }
 });
 window.addEventListener('online',pushDirty);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
 <script>

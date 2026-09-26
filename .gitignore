@@ -1,0 +1,5 @@
+*.bak
+upload/
+reference.md
+tracker-july-2026.html
+.DS_Store
