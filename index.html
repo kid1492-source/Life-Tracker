@@ -289,11 +289,6 @@
 
   <p class="foot">
     <span id="savedMsg" class="saved">Saved ✓</span>
-    <br><button class="navbtn" id="backupBtn" style="margin-top:14px;max-width:220px;">⬇ Backup all data</button>
-    <label class="navbtn" for="restoreFile" style="display:block;margin-top:8px;max-width:220px;box-sizing:border-box;text-align:center;">⬆ Restore from backup</label>
-    <input type="file" id="restoreFile" accept="application/json" style="display:none;">
-    <br><button class="navbtn" id="debugBtn" style="margin-top:8px;max-width:220px;">Show raw data for this month</button>
-    <pre id="debugData" style="display:none;text-align:left;white-space:pre-wrap;background:#1c1c1a;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:11px;color:var(--ink);margin-top:10px;max-height:300px;overflow:auto;"></pre>
   </p>
 </div>
 
@@ -634,52 +629,6 @@ saveBtn.onclick=async()=>{
   saveBtn.disabled=false;
 };
 
-loadMonth();
-
-// debug panel
-document.getElementById('debugBtn').onclick=async()=>{
-  const el=document.getElementById('debugData');
-  if(el.style.display==='block'){el.style.display='none';return;}
-  let out='KEY: '+storeKey()+'\n\nIN-MEMORY (after load+compat):\n'+JSON.stringify({days,review},null,2);
-  try{
-    const raw=await window.storage.get(storeKey());
-    out+='\n\nRAW STORAGE (as saved):\n'+(raw&&raw.value?raw.value:'(nothing stored under this key)');
-  }catch(e){out+='\n\nRAW STORAGE: (no entry / error reading key)';}
-  el.textContent=out;
-  el.style.display='block';
-};
-
-// backup — pulls every tracker:* key out of storage into one downloadable file
-document.getElementById('backupBtn').onclick=async()=>{
-  try{
-    const listRes=await window.storage.list('tracker:');
-    const keys=(listRes&&listRes.keys)||[];
-    const bundle={};
-    for(const k of keys){
-      try{const r=await window.storage.get(k);if(r&&r.value)bundle[k]=JSON.parse(r.value);}catch(e){}
-    }
-    if(Object.keys(bundle).length===0){alert('No data found in storage to back up.');return;}
-    const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download='life-tracker-backup-'+new Date().toISOString().slice(0,10)+'.json';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }catch(e){alert('Backup failed: '+e.message);}
-};
-
-// restore — reads a backup file and writes every key back into storage
-document.getElementById('restoreFile').onchange=async(ev)=>{
-  const file=ev.target.files[0];if(!file)return;
-  try{
-    const text=await file.text();
-    const bundle=JSON.parse(text);
-    let n=0;
-    for(const k in bundle){await window.storage.set(k,JSON.stringify(bundle[k]));n++;}
-    alert('Restored '+n+' month(s) of data. Reloading.');
-    loadMonth();
-  }catch(e){alert('Restore failed: '+e.message);}
-};
 </script>
 </body>
 </html>
