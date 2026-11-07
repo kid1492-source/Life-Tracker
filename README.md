@@ -1,28 +1,33 @@
 # Life Tracker
 
-Personal daily habit tracker — Solat, Taubat, Quran, routines, health metrics, family, trading practice.
+Personal daily habit tracker: Solat, Taubat, Quran, routines, health metrics, family, trading practice.
 
 ## Live setup
 
-- **Backend:** Supabase project `life-tracker` (ap-southeast-1)
-  - URL: `https://ydjixzyxmhjxqdctuwcm.supabase.co`
-  - Table: `tracker_months` (one row per user per month, JSON blob, RLS-locked to the signed-in user)
-- **Auth:** Supabase magic-link email sign-in (no password). Sign in once per device/browser.
-- **Frontend:** single static file (`index.html`) — no build step, no server needed.
+- **Backend:** Supabase project `life-tracker` (ap-southeast-1), URL `https://ydjixzyxmhjxqdctuwcm.supabase.co`
+  - `tracker_days`: one row per user per day (the day's fields as JSON)
+  - `tracker_reviews`: one row per user per month (weekly and monthly review notes)
+  - `tracker_days_history`: previous version of a day each time it is overwritten
+  - Row-level security: each signed-in account reads and writes only its own rows
+- **Auth:** email and password, or a sign-in link by email.
+- **Frontend:** single static file (`index.html`), no build step. Served by GitHub Pages.
+
+## How data is saved
+
+1. Every change is saved on the device immediately, so the screen never waits.
+2. The device then sends only the fields that changed, merged into that day's row in the cloud. Other fields and other days are never touched.
+3. Changes that can't be sent yet (offline, server error) stay on the device and are retried with back-off.
+4. When the app opens, or comes back to the foreground, it downloads the latest cloud copy. Unsent changes are kept, not overwritten.
+5. If another device changed the same field, the later save wins and the app shows a notice.
+6. Data saved while signed out is uploaded only for days the cloud doesn't already have. Days the cloud has are kept as a backup on the device.
+
+The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or Not synced.
 
 ## Publish to GitHub Pages
 
-1. Push this folder to a GitHub repo (`index.html` at the root).
-2. Repo → Settings → Pages → Source → `main` branch → Save.
-3. Visit `https://<username>.github.io/<repo>/` — the tracker loads directly (no extra filename needed).
+1. Settings → Pages → Source: `main` branch, root folder.
+2. The tracker is served at `https://<username>.github.io/<repo>/`.
 
-## How data flows
+## Rebuilding the database
 
-1. Open the site → sign in with email (magic link).
-2. Every tap/keystroke writes to `localStorage` instantly (offline-safe) and syncs to Supabase in the background.
-3. Opening the site on another device, after signing in with the same email, pulls the same data down.
-4. **Backup / Restore** buttons at the bottom export/import a full JSON snapshot — keep an occasional manual copy regardless of the cloud sync.
-
-## If you ever need to rebuild the database
-
-Run `schema.sql` in the Supabase project's SQL editor. It's idempotent (`create table if not exists`).
+Run `schema.sql` in the Supabase SQL editor. It is idempotent and does not delete data.
