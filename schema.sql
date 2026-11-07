@@ -63,14 +63,17 @@ alter table public.tracker_days_history enable row level security;
 drop policy if exists "tracker_days_history_select_own" on public.tracker_days_history;
 create policy "tracker_days_history_select_own" on public.tracker_days_history for select using (auth.uid() = user_id);
 
+-- Runs with the owner's rights: the history table is read-only for users, so the
+-- trigger must be allowed to write it. Without this, updates to existing days fail.
 create or replace function public.keep_day_history()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if tg_op = 'UPDATE' and old.data is distinct from new.data then
     insert into public.tracker_days_history (user_id, day, data) values (old.user_id, old.day, old.data);
   end if;
   return new;
 end $$;
+revoke all on function public.keep_day_history() from public, anon, authenticated;
 drop trigger if exists tracker_days_history_keep on public.tracker_days;
 create trigger tracker_days_history_keep after update on public.tracker_days
   for each row execute function public.keep_day_history();
