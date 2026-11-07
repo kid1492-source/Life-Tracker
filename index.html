@@ -30,6 +30,13 @@
   #saveDayMsg{font-size:12px;color:var(--muted);min-height:15px;margin-top:6px;}
   #saveDayMsg.ok{color:#8fc98f;}#saveDayMsg.err{color:#e88;}
 
+  .dr-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px;}
+  .mood{display:flex;gap:6px;}.mood span{flex:1;text-align:center;padding:9px 0;border:1px solid var(--line);border-radius:10px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none;}
+  .mood span.on{border-color:var(--pine);color:var(--ink);background:var(--pine-soft);}
+  .ref{padding:12px 16px;border-top:1px solid var(--line);}.ref:first-child{border-top:none;}
+  .ref .d{font-size:12px;font-weight:600;color:#D9A15C;}.ref p{margin:4px 0 0;font-size:13.5px;line-height:1.45;white-space:pre-wrap;}
+  .ref .m{font-size:11.5px;color:var(--muted);margin-left:6px;font-weight:500;}
+  .ref.empty{color:var(--muted);font-size:13px;}
   /* ---- Dashboard ---- */
   .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px;}
   .tab{flex:1;background:none;border:0;color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;padding:9px;border-radius:9px;cursor:pointer;}
@@ -303,10 +310,27 @@
     </div>
   </section>
 
+  <!-- Daily review -->
+  <section>
+    <div class="sec-label"><span class="dot" style="background:#D97757"></span><h2>Daily Review</h2></div>
+    <div class="card review-card">
+      <div class="mood" id="moodRow"><span data-m="1">😞 Low</span><span data-m="2">😐 Okay</span><span data-m="3">🙂 Good</span><span data-m="4">😄 Great</span></div>
+      <textarea id="dayNote" class="rev-note" style="min-height:90px" placeholder="Reflect on today — wins, misses, what to do tomorrow…"></textarea>
+      <div class="dr-meta"><span>Saved with this day</span><span id="dayNoteCount"></span></div>
+    </div>
+  </section>
+
   <!-- Monthly summary -->
   <div class="sum-head"><span class="dot"></span><h2 id="sumHead">August Targets</h2></div>
   <div class="sum-card" id="sumCard"></div>
 
+  <div id="dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="chart"><h3>Daily completion</h3><p class="sub" id="dailySub"></p><div id="cDaily"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div>
+      <details><summary>Table view</summary><div id="tDaily"></div></details></div>
+    <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
+    <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day.</p><div id="cHabits"></div></div>
+    <div class="chart"><h3>Average by weekday</h3><p class="sub">Average completion by day of week, so far this month.</p><div id="cWeekday"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div></div>
   <!-- Weekly review -->
   <div class="sum-head"><span class="dot"></span><h2>Weekly Review</h2></div>
   <div id="weeklyReview"></div>
@@ -318,13 +342,8 @@
     <textarea id="monthNote" class="rev-note" placeholder="How did the month go? Wins, misses, what to change next month…"></textarea>
   </div>
 
-  <div id="dash">
-    <div class="kpis" id="kpis"></div>
-    <div class="chart"><h3>Daily completion</h3><p class="sub" id="dailySub"></p><div id="cDaily"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div>
-      <details><summary>Table view</summary><div id="tDaily"></div></details></div>
-    <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
-    <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day.</p><div id="cHabits"></div></div>
-    <div class="chart"><h3>Average by weekday</h3><p class="sub">Average completion by day of week, so far this month.</p><div id="cWeekday"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div></div>
+    <div class="sum-head"><span class="dot"></span><h2>Daily reflections</h2></div>
+    <div class="card" id="reflections"></div>
   </div>
   <div id="tip"></div>
 
@@ -789,7 +808,7 @@ const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal','nSleep10',
   'dHajat','tahajud','taubat','weights','boxing','running','cqg','wife','ibu','parents'];
 const MAX=7+BOOL_KEYS.length; // 5 solat + protein + sleep + checkboxes
 
-function blankDay(){const o={solat:[0,0,0,0,0],solatNotes:['','','','',''],protein:0,sleep:null};
+function blankDay(){const o={solat:[0,0,0,0,0],solatNotes:['','','','',''],protein:0,sleep:null,note:'',mood:0};
   BOOL_KEYS.forEach(k=>o[k]=0); return o;}
 window.trackerBlankDay=blankDay;
 
@@ -843,6 +862,7 @@ async function loadMonth(){
   Object.values(days).forEach(d=>{if(d){
     if(d.solat&&Array.isArray(d.solat))d.solat=d.solat.map(v=>v===true?1:(v===false||v==null?0:(Number(v)||0)));
     BOOL_KEYS.forEach(k=>{if(d[k]===true)d[k]=1;else if(d[k]===false||d[k]===null||d[k]===undefined)d[k]=0;});}});
+  Object.values(days).forEach(d=>{if(d){if(typeof d.note!=='string')d.note='';if(typeof d.mood!=='number')d.mood=0;}});
   sel=(year===REAL.getFullYear()&&month0===REAL.getMonth())?REAL.getDate():1;
   buildGrid();buildReview();render();
 }
@@ -959,6 +979,11 @@ function render(){
   sv.textContent=(o.sleep==null?'—':o.sleep)+' / 7h';
   sv.classList.toggle('hit',o.sleep!=null&&o.sleep>=7);
   document.getElementById('sleepBar').style.width=Math.min(100,(o.sleep||0)/7*100)+'%';
+  // daily review
+  const MOODS=['','Low','Okay','Good','Great'];
+  document.querySelectorAll('#moodRow span').forEach(b=>b.classList.toggle('on',+b.dataset.m===o.mood));
+  const dn=document.getElementById('dayNote');if(dn.value!==(o.note||'')&&document.activeElement!==dn)dn.value=o.note||'';
+  document.getElementById('dayNoteCount').textContent=(o.note||'').length?(o.note.length+' chars'):'';
   // month ring
   let tot=0;for(let d=1;d<=n;d++)tot+=dayPoints(days[d]);
   const mpct=Math.round(tot/(MAX*n)*100);
@@ -971,6 +996,8 @@ function render(){
     bEl.style.width=pct+'%';bEl.style.background=t.hue==='amber'?'var(--amber)':'var(--pine)';});
   renderReview();
 }
+document.getElementById('dayNote').addEventListener('input',e=>{dayObj(sel).note=e.target.value;document.getElementById('dayNoteCount').textContent=e.target.value.length?(e.target.value.length+' chars'):'';scheduleSave();});
+document.querySelectorAll('#moodRow span').forEach(b=>b.addEventListener('click',()=>{const o=dayObj(sel),m=+b.dataset.m;o.mood=o.mood===m?0:m;save();}));
 // save-day bar pinned to the bottom of the screen
 const saveBar=document.createElement('div');
 saveBar.id='saveBar';
@@ -1030,6 +1057,14 @@ function renderDashboard(){
     if(u){const s=document.createElement('small');s.textContent=u;a.appendChild(s);}
     const b=document.createElement('div');b.className='kl';b.textContent=l;d.appendChild(a);d.appendChild(b);k.appendChild(d);});
   document.getElementById('dailySub').textContent=e?('% of daily goals done · '+goodDays+' of '+e+' days at 70%+ · dashed = average'):'No days yet this month.';
+
+  // --- Daily reflections ---
+  const rf=document.getElementById('reflections');rf.innerHTML='';let any=false;
+  for(let d=n;d>=1;d--){const o=days[d];if(!o||!(o.note&&o.note.trim())&&!o.mood)continue;any=true;
+    const r=document.createElement('div');r.className='ref';const a=document.createElement('span');a.className='d';a.textContent=dow(d)+' '+d;
+    const m=document.createElement('span');m.className='m';m.textContent=[['','😞 Low','😐 Okay','🙂 Good','😄 Great'][o.mood||0],Math.round(dayPoints(o)/MAX*100)+'%'].filter(Boolean).join(' · ');
+    r.appendChild(a);r.appendChild(m);if(o.note&&o.note.trim()){const p=document.createElement('p');p.textContent=o.note;r.appendChild(p);}rf.appendChild(r);}
+  if(!any){const r=document.createElement('div');r.className='ref empty';r.textContent='No reflections yet. Add one in Daily Review on any day.';rf.appendChild(r);}
 
   // --- Daily points column chart ---
   const cols=e||n;const W=340,H=150,L=22,B=18,T=8,R=4,pw=W-L-R,ph=H-T-B,bw=pw/cols;
