@@ -487,11 +487,11 @@ async function pull(){
   if(e1) throw e1;
   const {data:revs,error:e2}=await sb.from('tracker_reviews').select('month_key,data');
   if(e2) throw e2;
-  const present=new Set();
+  const cloud={};
   (rows||[]).forEach(r=>{
     const mk=r.day.slice(0,7), d=String(parseInt(r.day.slice(8,10),10));
     const day=dayIso(mk,d);
-    present.add(day);
+    cloud[day]=r.data;
     const server=norm(r.data);
     const c=readCache(mk), b=readBase(mk);
     const pend=changedDay(c.days[d],b.days[d]);
@@ -514,14 +514,19 @@ async function pull(){
     b.review=server;
     writeCache(mk,c); writeBase(mk,b);
   });
-  return {present};
+  return {cloud};
 }
 
-// Signed-out data is adopted only for days the cloud does not already have.
-// Days the cloud has are never overwritten; the device copy is kept as a backup.
-function adoptAnon(present){
+// Signed-out (or pre-sign-in) edits are merged in, never dropped:
+// - day not in the cloud: the whole day is adopted and uploaded;
+// - day in the cloud: each field is filled only where the cloud is still blank
+//   (for solat and notes, element by element). Where both sides have a different
+//   non-blank value, the cloud value is kept and the user is told.
+// The device copy is kept as a backup either way.
+function adoptAnon(cloud){
   const prefix='anon:'+PREFIX;
-  const adopted=[], kept=[];
+  const filled=[], conflicts=[];
+  const isBlank=v=>v===undefined||v===null||v===0||v===''||v===false;
   ls.keys().filter(k=>k.startsWith(prefix)).forEach(k=>{
     const mk=k.slice(prefix.length);
     const anon=parse(ls.get(k),{days:{}});
@@ -529,23 +534,43 @@ function adoptAnon(present){
     Object.keys(anon.days||{}).forEach(d=>{
       const day=dayIso(mk,d), v=anon.days[d];
       if(!v||same(norm(v),blank())) return;
-      if(present.has(day)){kept.push(day);return;}
-      if(!c.days[d]||same(norm(c.days[d]),blank())){c.days[d]=v;adopted.push(day);}
+      if(!(day in cloud)){
+        if(!c.days[d]||same(norm(c.days[d]),blank())){c.days[d]=v;filled.push(day);}
+        return;
+      }
+      const A=norm(v), C=norm(cloud[day]), take={};
+      Object.keys(A).forEach(f=>{
+        const a=A[f], cv=C[f];
+        if(Array.isArray(a)&&Array.isArray(cv)){
+          const merged=cv.map((x,i)=>isBlank(x)?(a[i]===undefined?x:a[i]):x);
+          const differs=cv.some((x,i)=>!isBlank(x)&&!isBlank(a[i])&&x!==a[i]);
+          if(differs) conflicts.push(day+' '+f);
+          if(!same(merged,cv)) take[f]=merged;
+          return;
+        }
+        if(same(a,blank()[f])) return;               // nothing recorded locally
+        if(isBlank(cv)){ take[f]=a; return; }        // cloud blank: fill in
+        if(!same(cv,a)) conflicts.push(day+' '+f);   // both set, different: keep cloud
+      });
+      if(hasKeys(take)){
+        c.days[d]=Object.assign({},norm(c.days[d]),take);
+        filled.push(day);
+      }
     });
     writeCache(mk,c);
     ls.set('backup:'+k,ls.get(k));
     ls.del(k);
   });
-  return {adopted,kept};
+  return {filled,conflicts};
 }
 
 function refresh(){ if(typeof window.trackerRefresh==='function') window.trackerRefresh(); }
 
 async function onSignedIn(){
   try{
-    const {present}=await pull();
-    const a=adoptAnon(present);
-    if(a.kept.length) addNotice('account','kept the cloud copy for '+a.kept.length+' day(s); this device had different unsent data (backup kept on this device)');
+    const {cloud}=await pull();
+    const a=adoptAnon(cloud);
+    if(a.conflicts.length) addNotice('account','kept the cloud value for '+a.conflicts.length+' field(s) that were set differently on this device (backup kept on this device): '+a.conflicts.slice(0,3).join(', '));
     lastError='';
   }catch(e){
     lastError=(e&&e.message)||String(e);
