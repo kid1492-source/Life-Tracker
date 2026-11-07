@@ -29,6 +29,34 @@
   #saveDayBtn:disabled{opacity:.6;}
   #saveDayMsg{font-size:12px;color:var(--muted);min-height:15px;margin-top:6px;}
   #saveDayMsg.ok{color:#8fc98f;}#saveDayMsg.err{color:#e88;}
+
+  /* ---- Dashboard ---- */
+  .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px;}
+  .tab{flex:1;background:none;border:0;color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;padding:9px;border-radius:9px;cursor:pointer;}
+  .tab.on{background:var(--pine);color:#fff;}
+  .dashmode .trackOnly{display:none;}
+  #dash{display:none;}
+  .dashmode #dash{display:block;}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);}
+  .kpi .kv{font-family:'Fraunces',serif;font-size:30px;font-weight:500;line-height:1.1;}
+  .kpi .kv small{font-family:'Inter',sans-serif;font-size:13px;color:var(--muted);font-weight:600;margin-left:3px;}
+  .kpi .kl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:4px;}
+  .chart{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px 12px;box-shadow:var(--shadow);margin-bottom:14px;position:relative;}
+  .chart h3{margin:0 4px 2px;font-size:14px;font-weight:600;}
+  .chart .sub{margin:0 4px 10px;font-size:12px;color:var(--muted);}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible;}
+  .chart svg text{font-family:'Inter',sans-serif;fill:var(--muted);font-size:9px;}
+  .chart svg .hit{cursor:pointer;}
+  .chart .legend{display:flex;gap:14px;flex-wrap:wrap;margin:8px 4px 0;font-size:11.5px;color:var(--muted);}
+  .chart .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .chart details{margin:10px 4px 0;font-size:12px;color:var(--muted);}
+  .chart summary{cursor:pointer;font-weight:600;}
+  .chart table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
+  .chart td,.chart th{padding:4px 6px;border-top:1px solid var(--line);text-align:left;color:var(--ink);}
+  .chart th{color:var(--muted);font-weight:600;}
+  #tip{position:fixed;z-index:80;pointer-events:none;background:#1f1f1d;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted);box-shadow:0 6px 20px rgba(0,0,0,.5);opacity:0;transition:opacity .08s;max-width:200px;}
+  #tip b{display:block;color:var(--ink);font-size:14px;font-weight:600;}
   .wrap{max-width:560px;margin:0 auto;}
 
   .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
@@ -169,6 +197,8 @@
     <button class="navbtn" id="nextM">Next ›</button>
   </div>
 
+  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
+
   <!-- Calendar -->
   <div class="cal">
     <div class="wd"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
@@ -287,6 +317,16 @@
     <div class="rev-stat"><span>Completion</span><span id="monthRevPct">0%</span></div>
     <textarea id="monthNote" class="rev-note" placeholder="How did the month go? Wins, misses, what to change next month…"></textarea>
   </div>
+
+  <div id="dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="chart"><h3>Daily completion</h3><p class="sub" id="dailySub"></p><div id="cDaily"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div>
+      <details><summary>Table view</summary><div id="tDaily"></div></details></div>
+    <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
+    <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day.</p><div id="cHabits"></div></div>
+    <div class="chart"><h3>Average by weekday</h3><p class="sub">Average completion by day of week, so far this month.</p><div id="cWeekday"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div></div>
+  </div>
+  <div id="tip"></div>
 
   <p class="foot">
     <span id="savedMsg" class="saved">Saved ✓</span>
@@ -952,6 +992,117 @@ saveBtn.onclick=async()=>{
   saveMsg.textContent=p?('✗ '+p+' change(s) still waiting to upload'):'✓ Everything is saved to the cloud';
   saveBtn.disabled=false;
 };
+
+// ---- Dashboard (month view) ----
+const HABITS=[['mWake','Wake up'],['mFajr','Fajr (early)'],['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],['nSleep10','Sleep by 10'],
+  ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['tahajud','Tahajud'],['taubat','Taubat'],
+  ['weights','Weights'],['boxing','Boxing'],['running','Running'],['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
+const NS='http://www.w3.org/2000/svg';
+const GREEN='#0ca30c',AMBER='#fab219',RED='#d03b3b',OFF='#3C3B37';
+function tl(p){return p>=70?GREEN:(p>=40?AMBER:RED);}
+function svgEl(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+const tip=document.getElementById('tip');
+function showTip(ev,title,val){tip.innerHTML='';const b=document.createElement('b');b.textContent=val;tip.appendChild(b);tip.appendChild(document.createTextNode(title));
+  tip.style.opacity=1;const w=tip.offsetWidth,x=Math.min(window.innerWidth-w-8,Math.max(8,ev.clientX-w/2));tip.style.left=x+'px';tip.style.top=Math.max(8,ev.clientY-tip.offsetHeight-14)+'px';}
+function hideTip(){tip.style.opacity=0;}
+function hookTip(el,title,val){const f=e=>showTip(e,title,val);el.addEventListener('pointermove',f);el.addEventListener('pointerdown',f);el.addEventListener('pointerleave',hideTip);
+  el.setAttribute('tabindex','0');el.setAttribute('aria-label',title+': '+val);
+  el.addEventListener('focus',()=>{const r=el.getBoundingClientRect();showTip({clientX:r.left+r.width/2,clientY:r.top},title,val);});el.addEventListener('blur',hideTip);}
+function elapsedDays(){const n=dim();
+  if(year===REAL.getFullYear()&&month0===REAL.getMonth())return REAL.getDate();
+  const before=(year<REAL.getFullYear())||(year===REAL.getFullYear()&&month0<REAL.getMonth());
+  return before?n:0;}
+function dayLabel(d){return dow(d)+' '+d+' '+MONTHS[month0].slice(0,3);}
+
+function renderDashboard(){
+  const n=dim(),e=elapsedDays();
+  const pts=[];for(let d=1;d<=n;d++)pts.push(dayPoints(days[d]));
+  const done=pts.slice(0,e);
+  const sum=done.reduce((a,b)=>a+b,0);
+  const avg=e?sum/e:0, best=e?Math.max(...done):0, bestD=e?done.indexOf(best)+1:0;
+  const goodDays=done.filter(p=>p>=MAX*0.7).length;
+  let solatDone=0;for(let d=1;d<=e;d++)solatDone+=(days[d]?days[d].solat.filter(s=>s===1).length:0);
+  const solatPct=e?Math.round(solatDone/(5*e)*100):0;
+  let streak=0;for(let d=e;d>=1;d--){const o=days[d];if(o&&o.solat.every(s=>s===1))streak++;else if(d===e&&e===REAL.getDate()&&year===REAL.getFullYear()&&month0===REAL.getMonth())continue;else break;}
+  const k=document.getElementById('kpis');k.innerHTML='';
+  [[Math.round(avg/MAX*100)+'%','','Avg daily completion'],[Math.round(best/MAX*100)+'%',bestD?'on '+dow(bestD)+' '+bestD:'','Best day'],[solatPct+'%','','Prayers done'],[streak,streak===1?'day':'days','Full-prayer streak']].forEach(([v,u,l])=>{
+    const d=document.createElement('div');d.className='kpi';const a=document.createElement('div');a.className='kv';a.textContent=v;
+    if(u){const s=document.createElement('small');s.textContent=u;a.appendChild(s);}
+    const b=document.createElement('div');b.className='kl';b.textContent=l;d.appendChild(a);d.appendChild(b);k.appendChild(d);});
+  document.getElementById('dailySub').textContent=e?('% of daily goals done · '+goodDays+' of '+e+' days at 70%+ · dashed = average'):'No days yet this month.';
+
+  // --- Daily points column chart ---
+  const cols=e||n;const W=340,H=150,L=22,B=18,T=8,R=4,pw=W-L-R,ph=H-T-B,bw=pw/cols;
+  let host=document.getElementById('cDaily');host.innerHTML='';
+  let svg=svgEl('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Daily points'},host);
+  [0,MAX/2,MAX].forEach(v=>{const y=T+ph-(v/MAX)*ph;svgEl('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:'#3C3B37','stroke-width':1},svg);
+    const t=svgEl('text',{x:L-5,y:y+3,'text-anchor':'end'},svg);t.textContent=Math.round(v/MAX*100)+'%';});
+  for(let d=1;d<=cols;d++){const v=pts[d-1],x=L+(d-1)*bw,h=(v/MAX)*ph;
+    if(d<=e&&v>0){const r=svgEl('rect',{x:x+1,y:T+ph-h,width:Math.max(2,bw-2),height:h,rx:2,fill:tl(v/MAX*100)},svg);
+      if(d===e&&year===REAL.getFullYear()&&month0===REAL.getMonth()){r.setAttribute('stroke','#F5F3EC');r.setAttribute('stroke-width','1.2');}}
+    else if(d<=e){svgEl('rect',{x:x+1,y:T+ph-2,width:Math.max(2,bw-2),height:2,rx:1,fill:'#55534B'},svg);}
+    const hit=svgEl('rect',{x:x,y:T,width:bw,height:ph,fill:'transparent',class:'hit'},svg);
+    hookTip(hit,dayLabel(d),d<=e?(Math.round(v/MAX*100)+'% ('+v+' of '+MAX+')'):'—');
+    if(cols<=14||d===1||d%5===0){const t=svgEl('text',{x:x+bw/2,y:H-4,'text-anchor':'middle'},svg);t.textContent=d;}}
+  if(e){const y=T+ph-(avg/MAX)*ph;svgEl('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:'#F5F3EC','stroke-width':1,'stroke-dasharray':'4 3',opacity:.7},svg);}
+  // table view
+  const td=document.getElementById('tDaily');td.innerHTML='';
+  const tb=document.createElement('table');tb.innerHTML='<tr><th>Day</th><th>Done</th><th>Prayers</th></tr>';
+  for(let d=1;d<=e;d++){const o=days[d],r=tb.insertRow();[dayLabel(d),Math.round(dayPoints(o)/MAX*100)+'% ('+dayPoints(o)+'/'+MAX+')',(o?o.solat.filter(s=>s===1).length:0)+' / 5'].forEach(t=>{r.insertCell().textContent=t;});}
+  td.appendChild(tb);
+
+  // --- Heatmaps ---
+  function heat(hostId,rows,get,lab2,lab0,zero){
+    const host=document.getElementById(hostId);host.innerHTML='';
+    const cols=e||n,LW=84,Wd=340,gap=2,cw=(Wd-LW)/cols,ch=14,top=2,Hh=top+rows.length*(ch+gap)+14;
+    const svg=svgEl('svg',{viewBox:`0 0 ${Wd} ${Hh}`,role:'img'},host);
+    for(let d=1;d<=cols;d++){if(cols<=14||d===1||d%5===0){const t=svgEl('text',{x:LW+(d-1)*cw+cw/2,y:Hh-3,'text-anchor':'middle'},svg);t.textContent=d;}}
+    rows.forEach(([key,label],ri)=>{const y=top+ri*(ch+gap);
+      const t=svgEl('text',{x:LW-6,y:y+ch/2+3,'text-anchor':'end'},svg);t.textContent=label;
+      for(let d=1;d<=cols;d++){const st=get(key,d),x=LW+(d-1)*cw;
+        let a={x:x+gap/2,y:y,width:cw-gap,height:ch,rx:2};
+        if(d>e)Object.assign(a,{fill:'none',stroke:'#3C3B37','stroke-width':.6,'stroke-dasharray':'2 2'});
+        else if(st===1)a.fill=GREEN;
+        else if(st===2)a.fill=AMBER;
+        else a.fill=zero;
+        const r=svgEl('rect',a,svg);
+        const hit=svgEl('rect',{x:x,y:y-1,width:cw,height:ch+gap,fill:'transparent',class:'hit'},svg);
+        hookTip(hit,label+' · '+dayLabel(d),d>e?'upcoming':(st===1?'Done':(st===2?lab2:lab0)));
+        void r;}});
+    const lg=document.createElement('div');lg.className='legend';
+    lg.innerHTML='<span><i style="background:'+GREEN+'"></i>Done</span><span><i style="background:'+AMBER+'"></i>'+lab2+'</span><span><i style="background:'+zero+'"></i>'+lab0+'</span>';
+    host.appendChild(lg);}
+  heat('cPrayers',PRAYERS.map((p,i)=>[i,p[0]]),(i,d)=>{const o=days[d];return o?o.solat[i]:0;},'Qada','Not done',RED);
+  heat('cHabits',HABITS,(k,d)=>{const o=days[d];return o?o[k]:0;},'Skipped','Not done',OFF);
+
+  // --- Weekday average ---
+  const sums=Array(7).fill(0),cnt=Array(7).fill(0);
+  for(let d=1;d<=e;d++){const w=new Date(year,month0,d).getDay();sums[w]+=pts[d-1];cnt[w]++;}
+  host=document.getElementById('cWeekday');host.innerHTML='';
+  const W2=340,H2=120,L2=22,B2=18,T2=8,pw2=W2-L2-4,ph2=H2-T2-B2,bw2=pw2/7;
+  svg=svgEl('svg',{viewBox:`0 0 ${W2} ${H2}`,role:'img'},host);
+  [0,MAX/2,MAX].forEach(v=>{const y=T2+ph2-(v/MAX)*ph2;svgEl('line',{x1:L2,x2:W2-4,y1:y,y2:y,stroke:'#3C3B37','stroke-width':1},svg);
+    const t=svgEl('text',{x:L2-5,y:y+3,'text-anchor':'end'},svg);t.textContent=Math.round(v/MAX*100)+'%';});
+  const avgs=sums.map((s,i)=>cnt[i]?s/cnt[i]:0),top=Math.max(...avgs);
+  avgs.forEach((a,i)=>{const x=L2+i*bw2,h=(a/MAX)*ph2;
+    if(cnt[i])svgEl('rect',{x:x+6,y:T2+ph2-h,width:bw2-12,height:h,rx:3,fill:tl(a/MAX*100)},svg);
+    const hit=svgEl('rect',{x:x,y:T2,width:bw2,height:ph2,fill:'transparent',class:'hit'},svg);
+    hookTip(hit,DOW[i]+' · '+cnt[i]+' day'+(cnt[i]===1?'':'s'),cnt[i]?Math.round(a/MAX*100)+'% avg':'—');
+    const t=svgEl('text',{x:x+bw2/2,y:H2-4,'text-anchor':'middle'},svg);t.textContent=DOW[i];
+    if(cnt[i]){const v=svgEl('text',{x:x+bw2/2,y:T2+ph2-h-3,'text-anchor':'middle'},svg);v.textContent=Math.round(a/MAX*100)+'%';}});
+}
+
+// ---- Track / Dashboard tabs ----
+(function(){
+  const wrap=document.querySelector('.wrap'),cal=wrap.querySelector('.cal'),dash=document.getElementById('dash');
+  for(let el=cal;el&&el!==dash;el=el.nextElementSibling)el.classList.add('trackOnly');
+  const tT=document.getElementById('tabTrack'),tD=document.getElementById('tabDash');
+  function setView(v){const on=v==='dash';document.body.classList.toggle('dashmode',on);tD.classList.toggle('on',on);tT.classList.toggle('on',!on);
+    document.getElementById('saveBar').style.display=on?'none':'';
+    try{localStorage.setItem('view',v);}catch(e){}if(on)renderDashboard();window.scrollTo(0,0);}
+  tT.onclick=()=>setView('track');tD.onclick=()=>setView('dash');
+  const baseR=render;render=function(){baseR();if(document.body.classList.contains('dashmode'))renderDashboard();};
+})();
 
 // Load this month at startup so today is selected (not day 1), before sign-in finishes.
 loadMonth();
