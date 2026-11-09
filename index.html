@@ -523,11 +523,13 @@ async function doFlush(){
       const next=pendingDays()[0];
       if(!next) break;
       await pushDay(next);
+      refresh(); // the device copy now holds the cloud's version: show it, so the next edit starts from it
     }
     for(let guard=0;guard<50;guard++){
       const next=pendingReviews()[0];
       if(!next) break;
       await pushReview(next);
+      refresh();
     }
     lastOk=Date.now(); lastError=''; retryMs=0; clearTimeout(retryTimer);
   }catch(e){
@@ -800,7 +802,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 <script>
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const REAL=new Date();
+let REAL=new Date(); // today; updated when the date changes while the app stays open
 let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
 const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal','nSleep10',
@@ -844,29 +846,45 @@ function metric(t){let c=0,n=dim();for(let d=1;d<=n;d++){const o=days[d];if(!o)c
   else if(t.key)c+=(o[t.key]===1?1:0);} return c;}
 
 // ---- persistence ----
-let saveTimer;
-function showSaved(){const m=document.getElementById('savedMsg');m.classList.add('show');setTimeout(()=>m.classList.remove('show'),1100);}
+// Every change is written to the device straight away (no delay), so the device copy and
+// the screen never disagree. The sync layer can then update the device copy at any time
+// and call trackerRefresh, without an older screen copy being written back over it.
+let savedTimer;
+function showSaved(){const m=document.getElementById('savedMsg');m.classList.add('show');clearTimeout(savedTimer);savedTimer=setTimeout(()=>m.classList.remove('show'),1100);}
 async function persist(){return window.storage.set(storeKey(),JSON.stringify({days,review}));}
 window.trackerBeforePull=()=>persist();
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{try{await persist();showSaved();}catch(e){}},250);}
-async function flush(){clearTimeout(saveTimer);try{await persist();}catch(e){}}
+function scheduleSave(){try{persist();showSaved();}catch(e){}}
+async function flush(){try{await persist();}catch(e){}}
 function save(){render();scheduleSave();}
-async function loadMonth(){
-  days={};review={weekly:{},monthly:''};
+async function loadData(){
+  let d={},rv={weekly:{},monthly:''};
   try{const r=await window.storage.get(storeKey());
     if(r&&r.value){const p=JSON.parse(r.value);
-      if(p&&typeof p==='object'&&p.days){days=p.days;review=Object.assign({weekly:{},monthly:''},p.review||{});if(!review.weekly)review.weekly={};}
-      else{days=p||{};}}
+      if(p&&typeof p==='object'&&p.days){d=p.days;rv=Object.assign({weekly:{},monthly:''},p.review||{});if(!rv.weekly)rv.weekly={};}
+      else{d=p||{};}}
   }catch(e){}
   // backward compat: convert old boolean to new three-state
-  Object.values(days).forEach(d=>{if(d){
-    if(d.solat&&Array.isArray(d.solat))d.solat=d.solat.map(v=>v===true?1:(v===false||v==null?0:(Number(v)||0)));
-    BOOL_KEYS.forEach(k=>{if(d[k]===true)d[k]=1;else if(d[k]===false||d[k]===null||d[k]===undefined)d[k]=0;});}});
-  Object.values(days).forEach(d=>{if(d){if(typeof d.note!=='string')d.note='';if(typeof d.mood!=='number')d.mood=0;}});
+  Object.values(d).forEach(o=>{if(o){
+    if(o.solat&&Array.isArray(o.solat))o.solat=o.solat.map(v=>v===true?1:(v===false||v==null?0:(Number(v)||0)));
+    BOOL_KEYS.forEach(k=>{if(o[k]===true)o[k]=1;else if(o[k]===false||o[k]===null||o[k]===undefined)o[k]=0;});
+    if(typeof o.note!=='string')o.note='';if(typeof o.mood!=='number')o.mood=0;}});
+  days=d;review=rv;
+}
+async function loadMonth(){
+  await loadData();
   sel=(year===REAL.getFullYear()&&month0===REAL.getMonth())?REAL.getDate():1;
   buildGrid();buildReview();render();
 }
-window.trackerRefresh=async function(){const keep=sel;await loadMonth();sel=keep;render();};
+// Called by the sync layer after it changes the device copy: reload the data, keep the
+// selected day, and leave any note the user is typing in alone.
+window.trackerRefresh=async function(){
+  await loadData();
+  for(let w=0;w<weeksInMonth();w++){const ta=document.getElementById('wnote'+w);
+    if(ta&&document.activeElement!==ta)ta.value=(review.weekly&&review.weekly[w])||'';}
+  const mn=document.getElementById('monthNote');
+  if(mn&&document.activeElement!==mn)mn.value=review.monthly||'';
+  render();
+};
 
 // ---- calendar (rebuilt per month) ----
 const grid=document.getElementById('grid');
@@ -1138,6 +1156,21 @@ function renderDashboard(){
   tT.onclick=()=>setView('track');tD.onclick=()=>setView('dash');
   const baseR=render;render=function(){baseR();if(document.body.classList.contains('dashmode'))renderDashboard();};
 })();
+
+// New day while the app stayed open (phones keep it in the background): move "today" on.
+// If the user was looking at the old today, select the new today, changing month if needed.
+function checkDate(){
+  const now=new Date();
+  if(now.toDateString()===REAL.toDateString())return;
+  const wasToday=year===REAL.getFullYear()&&month0===REAL.getMonth()&&sel===REAL.getDate();
+  REAL=now;
+  if(!wasToday){render();return;}
+  if(year!==now.getFullYear()||month0!==now.getMonth()){
+    flush().then(()=>{year=now.getFullYear();month0=now.getMonth();loadMonth();});
+  } else {sel=now.getDate();render();}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDate();});
+setInterval(checkDate,60000);
 
 // Load this month at startup so today is selected (not day 1), before sign-in finishes.
 loadMonth();
