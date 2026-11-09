@@ -221,6 +221,12 @@
   .ttxt::placeholder{color:var(--muted);}
   .trow.done .ttxt{color:var(--muted);text-decoration:line-through;text-decoration-color:#55534B;}
   .tdel{background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:3px 6px;flex:none;}
+  .test{flex:none;display:flex;align-items:center;margin-top:1px;color:var(--muted);font-size:14px;}
+  .test input{width:5ch;background:none;border:0;border-bottom:1px solid transparent;color:#D9A15C;font:inherit;font-size:13px;font-weight:600;text-align:center;padding:2px 0;}
+  .test input::placeholder{color:var(--muted);font-weight:500;opacity:.7;}
+  .test input:focus{outline:none;border-bottom-color:var(--pine);}
+  .trow.done .test input{color:var(--muted);}
+  .task-hd .tt{color:#D9A15C;}
   .tclr{flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;border:2px solid #4A4942;background:none;padding:0;cursor:pointer;}
   .tclr.set{border-color:transparent;}
   .tpal{display:flex;gap:10px;align-items:center;padding:4px 14px 12px 46px;border-bottom:1px solid var(--line);}
@@ -1212,6 +1218,16 @@ function taskRow(c,it){
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(inp.value.trim())addTask(c,it.id);else inp.blur();}};
   if(it.k&&!it.d)inp.style.color=it.k;
   r.appendChild(inp);
+  // Expected time, e.g. 30m or 1h 30m. Typed as 30, 30m, 1h, 1.5h, 1h30 or 1:30.
+  const est=document.createElement('span');est.className='test';
+  const ei=document.createElement('input');ei.type='text';ei.maxLength=8;ei.placeholder='time';ei.value=it.e||'';ei.setAttribute('aria-label','Expected time');
+  ei.oninput=()=>{const x=findTask(c,it.id);if(!x)return;if(ei.value.trim())x.e=ei.value.trim();else delete x.e;taskSig=taskSigNow();updateTaskHeads();scheduleSave();};
+  ei.onblur=()=>{const m=parseMins(ei.value);if(m!=null&&fmtMins(m)!==ei.value){ei.value=fmtMins(m);ei.oninput();}};
+  ei.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ei.blur();}};
+  const sizeEst=()=>{ei.style.width=(Math.max((ei.value||'time').length,2)+0.6)+'ch';};sizeEst();
+  ei.addEventListener('input',sizeEst);ei.addEventListener('blur',()=>setTimeout(sizeEst,0));
+  est.append('(',ei,')');
+  r.appendChild(est);
   const clr=document.createElement('button');clr.type='button';clr.className='tclr'+(it.k?' set':'');clr.setAttribute('aria-label','Text colour');
   if(it.k)clr.style.background=it.k;
   clr.onclick=()=>{taskPal=taskPal===it.id?'':it.id;renderTasks(true);};
@@ -1225,6 +1241,15 @@ function taskRow(c,it){
 // would swallow the tap (e.g. a checkbox tapped right after typing elsewhere).
 let taskShown='',taskSig='',taskPal='';  // taskPal: task whose colour choices are open
 // Text colour per task (same colours as the notes). Default is stored as no colour.
+function parseMins(v){
+  v=String(v||'').trim().toLowerCase().replace(/\s+/g,'');if(!v)return null;
+  let m;
+  if((m=v.match(/^(\d+):(\d{1,2})$/)))return +m[1]*60+ +m[2];
+  if((m=v.match(/^(\d+(?:\.\d+)?)h(?:r|rs|ours?)?(?:(\d+)m?(?:ins?)?)?$/)))return Math.round(+m[1]*60)+(+m[2]||0);
+  if((m=v.match(/^(\d+)(?:m|min|mins)?$/)))return +m[1];
+  return null;
+}
+function fmtMins(n){if(n<60)return n+'m';const h=Math.floor(n/60),r=n%60;return h+'h'+(r?' '+r+'m':'');}
 function taskPalette(c,it){
   const p=document.createElement('div');p.className='tpal';
   RT_TEXT.forEach(([name,hex],i)=>{
@@ -1250,7 +1275,7 @@ function renderTasks(force){
     const col=document.createElement('div');col.className='task-col '+c;
     const hd=document.createElement('div');hd.className='task-hd';
     hd.innerHTML='<span class="n"></span><div class="t"></div><div class="s"></div>';
-    hd.querySelector('.n').textContent=list.length?(done+' / '+list.length):'';
+    col.dataset.c=c;
     hd.querySelector('.t').textContent=title;hd.querySelector('.s').textContent=sub;
     col.appendChild(hd);
     list.forEach(it=>{col.appendChild(taskRow(c,it));if(taskPal===it.id)col.appendChild(taskPalette(c,it));});
@@ -1260,6 +1285,17 @@ function renderTasks(force){
     taskGrid.appendChild(col);
   });
   taskGrid.querySelectorAll('.ttxt').forEach(fitTask);
+  updateTaskHeads();
+}
+// Header: done / total, and the time still needed for unfinished tasks.
+function updateTaskHeads(){
+  const T=(days[sel]&&days[sel].tasks)||{};
+  taskGrid.querySelectorAll('.task-col').forEach(col=>{
+    const list=Array.isArray(T[col.dataset.c])?T[col.dataset.c]:[],done=list.filter(x=>x.d).length;
+    const left=list.reduce((a,x)=>a+(!x.d&&parseMins(x.e)||0),0);
+    const n=col.querySelector('.task-hd .n');n.textContent=list.length?(done+' / '+list.length):'';
+    if(left){const tt=document.createElement('span');tt.className='tt';tt.textContent=' · ~'+fmtMins(left);n.appendChild(tt);}
+  });
 }
 // Long tasks wrap onto more lines instead of being cut off.
 function fitTask(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
@@ -1296,7 +1332,7 @@ async function carryTasks(){
       if(!p||!p.tasks)continue;
       TASK_COLS.forEach(([c])=>(p.tasks[c]||[]).forEach(it=>{
         if(!it||!it.id||seen.has(it.id))return;seen.add(it.id);    // newest copy of each task wins
-        if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{}));
+        if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{},it.e?{e:it.e}:{}));
       }));
       if(p.tasks.carried)break;                                    // that day already holds older carries
     }
