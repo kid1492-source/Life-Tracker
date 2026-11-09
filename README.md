@@ -23,6 +23,10 @@ Personal daily habit tracker: Solat, Taubat, Quran, routines, health metrics, fa
 
 The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or Not synced.
 
+## Tasks
+
+The Track tab has a **Task** section (above Daily Review) with two lists per day: **MITs · Deep work** and **Quick wins**. Tasks are stored in the day's row as `tasks`. When today is opened, unfinished tasks from earlier days are copied to the top of today once (marked ↪). A task deleted or ticked today is not brought back.
+
 ## Publish to GitHub Pages
 
 1. Settings → Pages → Source: `main` branch, root folder.

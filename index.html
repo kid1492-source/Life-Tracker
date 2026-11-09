@@ -199,6 +199,30 @@
 
   .foot{text-align:center;margin-top:22px;font-size:11.5px;color:var(--muted);}
   .saved{opacity:0;transition:opacity .3s;}.saved.show{opacity:1;}
+
+  /* ---- Tasks (per day; unfinished ones carry over to today) ---- */
+  .task-grid{display:grid;grid-template-columns:1fr 1fr;}
+  .task-col{padding:12px 0 4px;min-width:0;}
+  .task-col+.task-col{border-left:1px solid var(--line);}
+  .task-hd{padding:0 14px 10px;border-bottom:1px solid var(--line);}
+  .task-hd .t{font-size:13.5px;font-weight:700;}
+  .task-hd .s{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;}
+  .task-col.deep .task-hd .t{color:#D9A15C;}
+  .task-col.quick .task-hd .t{color:var(--pine);}
+  .task-hd .n{float:right;font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--muted);margin-left:6px;}
+  .trow{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line);}
+  .tchk{width:22px;height:22px;border-radius:6px;border:2px solid #4A4942;background:none;padding:0;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .tchk svg{width:11px;height:11px;stroke:#fff;stroke-width:3.2;fill:none;opacity:0;}
+  .trow.done .tchk{background:#43A047;border-color:#43A047;}
+  .trow.done .tchk svg{opacity:1;}
+  .tcar{color:#D9A15C;font-size:12px;flex:none;}
+  .ttxt{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid transparent;color:var(--ink);font:inherit;font-size:13.5px;padding:3px 0;}
+  .ttxt:focus{outline:none;border-bottom-color:var(--pine);}
+  .ttxt::placeholder{color:var(--muted);}
+  .trow.done .ttxt{color:var(--muted);text-decoration:line-through;text-decoration-color:#55534B;}
+  .tdel{background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:4px 6px;flex:none;}
+  .tadd{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:10px 14px;cursor:pointer;}
+  .tadd:active{color:var(--ink);}
 </style>
 </head>
 <body>
@@ -327,6 +351,12 @@
       <div class="row" data-key="ibu"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Call ibu</div><div class="freq">1× per week</div></div></div>
       <div class="row" data-key="parents"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Visit parents</div><div class="freq">1× per month</div></div></div>
     </div>
+  </section>
+
+  <!-- Tasks for the selected day -->
+  <section id="taskSec">
+    <div class="sec-label"><span class="dot" style="background:#D9A15C"></span><h2>Task</h2></div>
+    <div class="card"><div class="task-grid" id="taskGrid"></div></div>
   </section>
 
   <!-- Daily review -->
@@ -1139,6 +1169,132 @@ saveBtn.onclick=async()=>{
   saveMsg.textContent=p?('✗ '+p+' change(s) still waiting to upload'):'✓ Everything is saved to the cloud';
   saveBtn.disabled=false;
 };
+
+// ---- Tasks ----
+// Stored per day as o.tasks = {deep:[{id,t,d,c}], quick:[...], carried:1}.
+// t = text, d = done (0/1), c = carried over from an earlier day. A day with no tasks
+// field was never set up. When today is opened, unfinished tasks from earlier days are
+// copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
+const TASK_COLS=[['deep','MITs · Deep work','Most important, needs focus'],['quick','Quick wins','Less important, but quick']];
+const taskGrid=document.getElementById('taskGrid');
+const newTaskId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function dayTasks(o){if(!o.tasks||typeof o.tasks!=='object')o.tasks={};
+  TASK_COLS.forEach(([c])=>{if(!Array.isArray(o.tasks[c]))o.tasks[c]=[];});return o.tasks;}
+function findTask(c,id){return dayTasks(dayObj(sel))[c].find(x=>x.id===id);}
+function focusTask(id){const el=taskGrid.querySelector('[data-id="'+id+'"] .ttxt');if(el)el.focus();}
+function addTask(c,afterId){
+  const list=dayTasks(dayObj(sel))[c];
+  const it={id:newTaskId(),t:'',d:0};
+  const i=afterId?list.findIndex(x=>x.id===afterId):-1;
+  if(i>=0)list.splice(i+1,0,it);else list.push(it);
+  scheduleSave();renderTasks(true);focusTask(it.id);
+}
+function pruneEmptyTasks(){
+  const o=days[sel];if(!o||!o.tasks)return false;let changed=false;
+  TASK_COLS.forEach(([c])=>{const l=o.tasks[c]||[],k=l.filter(x=>String(x.t||'').trim());
+    if(k.length!==l.length){o.tasks[c]=k;changed=true;}});
+  return changed;
+}
+function taskRow(c,it){
+  const r=document.createElement('div');r.className='trow'+(it.d?' done':'');r.dataset.id=it.id;
+  const chk=document.createElement('button');chk.type='button';chk.className='tchk';chk.setAttribute('aria-label','Mark done');
+  chk.innerHTML='<svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg>';
+  chk.onclick=()=>{const x=findTask(c,it.id);if(!x||!String(x.t||'').trim())return;x.d=x.d?0:1;save();renderTasks(true);};
+  r.appendChild(chk);
+  if(it.c){const m=document.createElement('span');m.className='tcar';m.textContent='↪';m.title='Carried over from an earlier day';r.appendChild(m);}
+  const inp=document.createElement('input');inp.type='text';inp.className='ttxt';inp.maxLength=120;inp.value=it.t||'';inp.placeholder='New task';
+  inp.oninput=()=>{const x=findTask(c,it.id);if(!x)return;x.t=inp.value;taskSig=taskSigNow();scheduleSave();}; // screen already shows it
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(inp.value.trim())addTask(c,it.id);else inp.blur();}};
+  r.appendChild(inp);
+  const del=document.createElement('button');del.type='button';del.className='tdel';del.textContent='×';del.setAttribute('aria-label','Delete task');
+  del.onclick=()=>{const T=dayTasks(dayObj(sel));T[c]=T[c].filter(x=>x.id!==it.id);save();renderTasks(true);};
+  r.appendChild(del);
+  return r;
+}
+// Redraw only when the tasks really changed: redrawing between a tap's press and release
+// would swallow the tap (e.g. a checkbox tapped right after typing elsewhere).
+let taskShown='',taskSig='';
+const taskSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel].tasks)||null);
+function renderTasks(force){
+  const key=storeKey()+':'+sel;
+  if(taskShown!==key){taskShown=key;carryTasks();}
+  const sig=taskSigNow();
+  if(!force&&sig===taskSig)return;
+  if(!force&&taskGrid.contains(document.activeElement))return; // don't redraw while typing
+  taskSig=sig;
+  const o=days[sel],T=(o&&o.tasks)||{};
+  taskGrid.innerHTML='';
+  TASK_COLS.forEach(([c,title,sub])=>{
+    const list=Array.isArray(T[c])?T[c]:[],done=list.filter(x=>x.d).length;
+    const col=document.createElement('div');col.className='task-col '+c;
+    const hd=document.createElement('div');hd.className='task-hd';
+    hd.innerHTML='<span class="n"></span><div class="t"></div><div class="s"></div>';
+    hd.querySelector('.n').textContent=list.length?(done+' / '+list.length):'';
+    hd.querySelector('.t').textContent=title;hd.querySelector('.s').textContent=sub;
+    col.appendChild(hd);
+    list.forEach(it=>col.appendChild(taskRow(c,it)));
+    const add=document.createElement('button');add.type='button';add.className='tadd';add.textContent='+ Add task';
+    add.onclick=()=>addTask(c,null);
+    col.appendChild(add);
+    taskGrid.appendChild(col);
+  });
+}
+// Leaving the task list: drop empty rows and redraw with the latest data.
+taskGrid.addEventListener('focusout',()=>setTimeout(()=>{
+  if(taskGrid.contains(document.activeElement))return;
+  if(pruneEmptyTasks())scheduleSave();
+  renderTasks();
+},0));
+
+// Carry unfinished tasks into today. Waits for the first cloud download when signed in,
+// so a stale device copy can't overwrite tasks added on another device.
+let carryReady=false,carrying=false;
+async function readMonthDays(y,m0){
+  if(y===year&&m0===month0)return days;
+  try{const r=await window.storage.get('tracker:'+y+'-'+String(m0+1).padStart(2,'0'));
+    const p=r&&r.value?JSON.parse(r.value):null;return (p&&p.days)||{};}catch(e){return {};}
+}
+async function carryTasks(){
+  if(!carryReady||carrying)return;
+  const y0=year,m0=month0;
+  if(y0!==REAL.getFullYear()||m0!==REAL.getMonth())return;
+  const td=REAL.getDate();
+  if(days[td]&&days[td].tasks&&days[td].tasks.carried)return;
+  carrying=true;
+  try{
+    const seen=new Set(),take={},cache={};
+    TASK_COLS.forEach(([c])=>take[c]=[]);
+    for(let back=1;back<=31;back++){
+      const dt=new Date(y0,m0,td-back),mk=dt.getFullYear()+'-'+dt.getMonth();
+      if(!cache[mk])cache[mk]=await readMonthDays(dt.getFullYear(),dt.getMonth());
+      const p=cache[mk][dt.getDate()];
+      if(!p||!p.tasks)continue;
+      TASK_COLS.forEach(([c])=>(p.tasks[c]||[]).forEach(it=>{
+        if(!it||!it.id||seen.has(it.id))return;seen.add(it.id);    // newest copy of each task wins
+        if(!it.d&&String(it.t||'').trim())take[c].push({id:it.id,t:it.t,d:0,c:1});
+      }));
+      if(p.tasks.carried)break;                                    // that day already holds older carries
+    }
+    if(year!==y0||month0!==m0)return;                              // month changed while reading
+    const o=dayObj(td);
+    if(o.tasks&&o.tasks.carried)return;
+    const any=TASK_COLS.some(([c])=>take[c].length);
+    if(!any&&!o.tasks)return;                                      // nothing to do; don't create a field
+    const T=dayTasks(o),have=new Set();
+    TASK_COLS.forEach(([c])=>T[c].forEach(x=>have.add(x.id)));
+    TASK_COLS.forEach(([c])=>{T[c]=take[c].filter(x=>!have.has(x.id)).concat(T[c]);});
+    T.carried=1;
+    scheduleSave();
+    if(sel===td)renderTasks(!taskGrid.contains(document.activeElement));
+  }finally{carrying=false;}
+}
+const baseTaskRender=render;
+render=function(){baseTaskRender();renderTasks();};
+const baseTaskRefresh=window.trackerRefresh;
+window.trackerRefresh=async function(){await baseTaskRefresh();carryReady=true;carryTasks();};
+// Signed out (or sign-in never resolves): carry from the device copy.
+setTimeout(()=>{if(!carryReady&&!(window.trackerSync&&window.trackerSync.signedIn())){carryReady=true;carryTasks();}},4000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(carryTasks,1500);});
 
 // ---- Dashboard (month view) ----
 // Early morning win: the first three habits of the day, all done.
