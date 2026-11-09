@@ -48,6 +48,7 @@
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);}
   .kpi .kv{font-family:'Fraunces',serif;font-size:30px;font-weight:500;line-height:1.1;}
   .kpi .kv small{font-family:'Inter',sans-serif;font-size:13px;color:var(--muted);font-weight:600;margin-left:3px;}
+  .kpi.wide{grid-column:1 / -1;}
   .kpi .kl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:4px;}
   .chart{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px 12px;box-shadow:var(--shadow);margin-bottom:14px;position:relative;}
   .chart h3{margin:0 4px 2px;font-size:14px;font-weight:600;}
@@ -241,6 +242,7 @@
     <div class="sec-label"><span class="dot" style="background:#D9A15C"></span><h2>Morning</h2></div>
     <div class="card">
       <div class="row" data-key="mWake"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Wake up</div><div class="freq">5:00 AM</div></div></div>
+      <div class="row" data-key="tahajud"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Tahajud</div><div class="freq">Night prayer</div></div></div>
       <div class="row" data-key="mFajr"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Fajr</div><div class="freq">On time</div></div></div>
       <div class="row" data-key="mQuran"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Quran</div><div class="freq">After Fajr</div></div></div>
     </div>
@@ -278,7 +280,6 @@
         <div class="solat-top"><span class="t">Solat</span><span class="solat-count" id="solatCount">0 / 5</span></div>
         <div class="prayers" id="prayers"></div>
       </div>
-      <div class="row" data-key="tahajud"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Tahajud</div><div class="freq">Night prayer</div></div></div>
       <div class="row" data-key="taubat"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Taubat / deep prayer</div><div class="freq">2× per week</div></div></div>
       <div class="row" data-key="dHajat"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Solat hajat</div><div class="freq">Daily</div></div></div>
     </div>
@@ -366,7 +367,7 @@
     <div class="chart"><h3>Daily completion</h3><p class="sub" id="dailySub"></p><div id="cDaily"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div>
       <details><summary>Table view</summary><div id="tDaily"></div></details></div>
     <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
-    <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day.</p><div id="cHabits"></div></div>
+    <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day. ★ Early win = Wake up, Tahajud and Fajr all done.</p><div id="cHabits"></div></div>
     <div class="chart"><h3>Average by weekday</h3><p class="sub">Average completion by day of week, so far this month.</p><div id="cWeekday"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div></div>
     <!-- Read-only: notes are written on the Track tab -->
     <div class="sum-head"><span class="dot"></span><h2>Weekly Reviews</h2></div>
@@ -1140,8 +1141,11 @@ saveBtn.onclick=async()=>{
 };
 
 // ---- Dashboard (month view) ----
-const HABITS=[['mWake','Wake up'],['mFajr','Fajr (early)'],['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],['nSleep10','Sleep by 10'],
-  ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['tahajud','Tahajud'],['taubat','Taubat'],
+// Early morning win: the first three habits of the day, all done.
+const EARLY=[['mWake','Wake up'],['tahajud','Tahajud'],['mFajr','Fajr (early)']];
+const earlyWin=o=>!!o&&EARLY.every(([k])=>o[k]===1);
+const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],['nSleep10','Sleep by 10'],
+  ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['taubat','Taubat'],
   ['weights','Weights'],['boxing','Boxing'],['running','Running'],['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
 const NS='http://www.w3.org/2000/svg';
 const GREEN='#0ca30c',AMBER='#fab219',RED='#d03b3b',OFF='#3C3B37';
@@ -1178,6 +1182,12 @@ function renderDashboard(){
     const d=document.createElement('div');d.className='kpi';const a=document.createElement('div');a.className='kv';a.textContent=v;
     if(u){const s=document.createElement('small');s.textContent=u;a.appendChild(s);}
     const b=document.createElement('div');b.className='kl';b.textContent=l;d.appendChild(a);d.appendChild(b);k.appendChild(d);});
+  // Early morning wins (full-width card)
+  let wins=0;for(let d=1;d<=e;d++)if(earlyWin(days[d]))wins++;
+  let ews=0;for(let d=e;d>=1;d--){if(earlyWin(days[d]))ews++;else if(d===e&&e===REAL.getDate()&&year===REAL.getFullYear()&&month0===REAL.getMonth())continue;else break;}
+  {const d=document.createElement('div');d.className='kpi wide';const a=document.createElement('div');a.className='kv';a.textContent=wins;
+   const sm=document.createElement('small');sm.textContent='of '+e+' days'+(ews>1?' · '+ews+'-day streak':'');a.appendChild(sm);
+   const b=document.createElement('div');b.className='kl';b.textContent='★ Early morning wins · Wake up, Tahajud, Fajr';d.appendChild(a);d.appendChild(b);k.appendChild(d);}
   document.getElementById('dailySub').textContent=e?('% of daily goals done · '+goodDays+' of '+e+' days at 70%+ · dashed = average'):'No days yet this month.';
 
   // --- Weekly reviews (read-only) ---
@@ -1228,28 +1238,39 @@ function renderDashboard(){
   td.appendChild(tb);
 
   // --- Heatmaps ---
+  // rows: [key,label] habit rows, ['__sep'] a divider, ['__early','Early win'] the summary row.
   function heat(hostId,rows,get,lab2,lab0,zero){
     const host=document.getElementById(hostId);host.innerHTML='';
-    const cols=e||n,LW=84,Wd=340,gap=2,cw=(Wd-LW)/cols,ch=14,top=2,Hh=top+rows.length*(ch+gap)+14;
+    const cols=e||n,LW=84,Wd=340,gap=2,cw=(Wd-LW)/cols,ch=14,top=2,SEP=10;
+    const hOf=r=>r[0]==='__sep'?SEP:ch+gap;
+    const Hh=top+rows.reduce((a,r)=>a+hOf(r),0)+14;
     const svg=svgEl('svg',{viewBox:`0 0 ${Wd} ${Hh}`,role:'img'},host);
     for(let d=1;d<=cols;d++){if(cols<=14||d===1||d%5===0){const t=svgEl('text',{x:LW+(d-1)*cw+cw/2,y:Hh-3,'text-anchor':'middle'},svg);t.textContent=d;}}
-    rows.forEach(([key,label],ri)=>{const y=top+ri*(ch+gap);
+    let y=top;
+    rows.forEach(row=>{const [key,label]=row;
+      if(key==='__sep'){svgEl('line',{x1:8,x2:Wd,y1:y+SEP/2-1,y2:y+SEP/2-1,stroke:'#55534B','stroke-width':.8},svg);y+=SEP;return;}
+      const early=key==='__early';
       const t=svgEl('text',{x:LW-6,y:y+ch/2+3,'text-anchor':'end'},svg);t.textContent=label;
-      for(let d=1;d<=cols;d++){const st=get(key,d),x=LW+(d-1)*cw;
+      if(early){t.style.fill='#F5F3EC';t.style.fontWeight='700';}
+      for(let d=1;d<=cols;d++){const x=LW+(d-1)*cw,o=days[d];
+        const st=early?(earlyWin(o)?1:0):get(key,d);
         let a={x:x+gap/2,y:y,width:cw-gap,height:ch,rx:2};
         if(d>e)Object.assign(a,{fill:'none',stroke:'#3C3B37','stroke-width':.6,'stroke-dasharray':'2 2'});
         else if(st===1)a.fill=GREEN;
         else if(st===2)a.fill=AMBER;
         else a.fill=zero;
-        const r=svgEl('rect',a,svg);
+        svgEl('rect',a,svg);
         const hit=svgEl('rect',{x:x,y:y-1,width:cw,height:ch+gap,fill:'transparent',class:'hit'},svg);
-        hookTip(hit,label+' · '+dayLabel(d),d>e?'upcoming':(st===1?'Done':(st===2?lab2:lab0)));
-        void r;}});
+        let val=d>e?'upcoming':(st===1?'Done':(st===2?lab2:lab0));
+        if(early&&d<=e){const got=EARLY.filter(([k])=>o&&o[k]===1).length;
+          val=(st===1?'Early win ✓':got+' of 3 done')+' — '+EARLY.map(([k,l])=>l.replace(' (early)','')+(o&&o[k]===1?' ✓':(o&&o[k]===2?' ✕':' –'))).join(', ');}
+        hookTip(hit,label+' · '+dayLabel(d),val);}
+      y+=ch+gap;});
     const lg=document.createElement('div');lg.className='legend';
     lg.innerHTML='<span><i style="background:'+GREEN+'"></i>Done</span><span><i style="background:'+AMBER+'"></i>'+lab2+'</span><span><i style="background:'+zero+'"></i>'+lab0+'</span>';
     host.appendChild(lg);}
   heat('cPrayers',PRAYERS.map((p,i)=>[i,p[0]]),(i,d)=>{const o=days[d];return o?o.solat[i]:0;},'Qada','Not done',RED);
-  heat('cHabits',HABITS,(k,d)=>{const o=days[d];return o?o[k]:0;},'Skipped','Not done',OFF);
+  heat('cHabits',[['__early','★ Early win'],...EARLY,['__sep'],...HABITS.slice(EARLY.length)],(k,d)=>{const o=days[d];return o?o[k]:0;},'Skipped','Not done',OFF);
 
   // --- Weekday average ---
   const sums=Array(7).fill(0),cnt=Array(7).fill(0);
