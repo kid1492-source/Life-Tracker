@@ -201,26 +201,31 @@
   .saved{opacity:0;transition:opacity .3s;}.saved.show{opacity:1;}
 
   /* ---- Tasks (per day; unfinished ones carry over to today) ---- */
-  .task-grid{display:grid;grid-template-columns:1fr 1fr;}
+  .task-grid{display:block;}
   .task-col{padding:12px 0 4px;min-width:0;}
-  .task-col+.task-col{border-left:1px solid var(--line);}
+  .task-col+.task-col{border-top:1px solid var(--line);}
   .task-hd{padding:0 14px 10px;border-bottom:1px solid var(--line);}
   .task-hd .t{font-size:13.5px;font-weight:700;}
   .task-hd .s{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;}
   .task-col.deep .task-hd .t{color:#D9A15C;}
   .task-col.quick .task-hd .t{color:var(--pine);}
   .task-hd .n{float:right;font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--muted);margin-left:6px;}
-  .trow{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line);}
-  .tchk{width:22px;height:22px;border-radius:6px;border:2px solid #4A4942;background:none;padding:0;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .trow{display:flex;align-items:flex-start;gap:10px;padding:9px 8px 9px 14px;border-bottom:1px solid var(--line);}
+  .tchk{margin-top:1px;width:22px;height:22px;border-radius:6px;border:2px solid #4A4942;background:none;padding:0;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .tchk svg{width:11px;height:11px;stroke:#fff;stroke-width:3.2;fill:none;opacity:0;}
   .trow.done .tchk{background:#43A047;border-color:#43A047;}
   .trow.done .tchk svg{opacity:1;}
-  .tcar{color:#D9A15C;font-size:12px;flex:none;}
-  .ttxt{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid transparent;color:var(--ink);font:inherit;font-size:13.5px;padding:3px 0;}
+  .tcar{color:#D9A15C;font-size:12px;flex:none;margin-top:4px;}
+  .ttxt{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid transparent;color:var(--ink);font:inherit;font-size:14.5px;line-height:1.4;padding:2px 0;resize:none;overflow:hidden;display:block;height:24px;}
   .ttxt:focus{outline:none;border-bottom-color:var(--pine);}
   .ttxt::placeholder{color:var(--muted);}
   .trow.done .ttxt{color:var(--muted);text-decoration:line-through;text-decoration-color:#55534B;}
-  .tdel{background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:4px 6px;flex:none;}
+  .tdel{background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:3px 6px;flex:none;}
+  .tclr{flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;border:2px solid #4A4942;background:none;padding:0;cursor:pointer;}
+  .tclr.set{border-color:transparent;}
+  .tpal{display:flex;gap:10px;align-items:center;padding:4px 14px 12px 46px;border-bottom:1px solid var(--line);}
+  .tpal button{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer;box-shadow:0 0 0 1px #4A4942 inset;}
+  .tpal button.on{border-color:var(--ink);}
   .tadd{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:10px 14px;cursor:pointer;}
   .tadd:active{color:var(--ink);}
 </style>
@@ -1202,10 +1207,15 @@ function taskRow(c,it){
   chk.onclick=()=>{const x=findTask(c,it.id);if(!x||!String(x.t||'').trim())return;x.d=x.d?0:1;save();renderTasks(true);};
   r.appendChild(chk);
   if(it.c){const m=document.createElement('span');m.className='tcar';m.textContent='↪';m.title='Carried over from an earlier day';r.appendChild(m);}
-  const inp=document.createElement('input');inp.type='text';inp.className='ttxt';inp.maxLength=120;inp.value=it.t||'';inp.placeholder='New task';
-  inp.oninput=()=>{const x=findTask(c,it.id);if(!x)return;x.t=inp.value;taskSig=taskSigNow();scheduleSave();}; // screen already shows it
+  const inp=document.createElement('textarea');inp.rows=1;inp.className='ttxt';inp.maxLength=200;inp.value=it.t||'';inp.placeholder='New task';
+  inp.oninput=()=>{fitTask(inp);const x=findTask(c,it.id);if(!x)return;x.t=inp.value;taskSig=taskSigNow();scheduleSave();}; // screen already shows it
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(inp.value.trim())addTask(c,it.id);else inp.blur();}};
+  if(it.k&&!it.d)inp.style.color=it.k;
   r.appendChild(inp);
+  const clr=document.createElement('button');clr.type='button';clr.className='tclr'+(it.k?' set':'');clr.setAttribute('aria-label','Text colour');
+  if(it.k)clr.style.background=it.k;
+  clr.onclick=()=>{taskPal=taskPal===it.id?'':it.id;renderTasks(true);};
+  r.appendChild(clr);
   const del=document.createElement('button');del.type='button';del.className='tdel';del.textContent='×';del.setAttribute('aria-label','Delete task');
   del.onclick=()=>{const T=dayTasks(dayObj(sel));T[c]=T[c].filter(x=>x.id!==it.id);save();renderTasks(true);};
   r.appendChild(del);
@@ -1213,11 +1223,22 @@ function taskRow(c,it){
 }
 // Redraw only when the tasks really changed: redrawing between a tap's press and release
 // would swallow the tap (e.g. a checkbox tapped right after typing elsewhere).
-let taskShown='',taskSig='';
+let taskShown='',taskSig='',taskPal='';  // taskPal: task whose colour choices are open
+// Text colour per task (same colours as the notes). Default is stored as no colour.
+function taskPalette(c,it){
+  const p=document.createElement('div');p.className='tpal';
+  RT_TEXT.forEach(([name,hex],i)=>{
+    const b=document.createElement('button');b.type='button';b.title=name;b.setAttribute('aria-label',name+' text');
+    b.style.background=hex;if((it.k||'')===(i?hex:''))b.classList.add('on');
+    b.onclick=()=>{const x=findTask(c,it.id);if(!x)return;if(i)x.k=hex;else delete x.k;taskPal='';save();renderTasks(true);};
+    p.appendChild(b);
+  });
+  return p;
+}
 const taskSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel].tasks)||null);
 function renderTasks(force){
   const key=storeKey()+':'+sel;
-  if(taskShown!==key){taskShown=key;carryTasks();}
+  if(taskShown!==key){taskShown=key;taskPal='';carryTasks();}
   const sig=taskSigNow();
   if(!force&&sig===taskSig)return;
   if(!force&&taskGrid.contains(document.activeElement))return; // don't redraw while typing
@@ -1232,13 +1253,17 @@ function renderTasks(force){
     hd.querySelector('.n').textContent=list.length?(done+' / '+list.length):'';
     hd.querySelector('.t').textContent=title;hd.querySelector('.s').textContent=sub;
     col.appendChild(hd);
-    list.forEach(it=>col.appendChild(taskRow(c,it)));
+    list.forEach(it=>{col.appendChild(taskRow(c,it));if(taskPal===it.id)col.appendChild(taskPalette(c,it));});
     const add=document.createElement('button');add.type='button';add.className='tadd';add.textContent='+ Add task';
     add.onclick=()=>addTask(c,null);
     col.appendChild(add);
     taskGrid.appendChild(col);
   });
+  taskGrid.querySelectorAll('.ttxt').forEach(fitTask);
 }
+// Long tasks wrap onto more lines instead of being cut off.
+function fitTask(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+window.addEventListener('resize',()=>taskGrid.querySelectorAll('.ttxt').forEach(fitTask));
 // Leaving the task list: drop empty rows and redraw with the latest data.
 taskGrid.addEventListener('focusout',()=>setTimeout(()=>{
   if(taskGrid.contains(document.activeElement))return;
@@ -1271,7 +1296,7 @@ async function carryTasks(){
       if(!p||!p.tasks)continue;
       TASK_COLS.forEach(([c])=>(p.tasks[c]||[]).forEach(it=>{
         if(!it||!it.id||seen.has(it.id))return;seen.add(it.id);    // newest copy of each task wins
-        if(!it.d&&String(it.t||'').trim())take[c].push({id:it.id,t:it.t,d:0,c:1});
+        if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{}));
       }));
       if(p.tasks.carried)break;                                    // that day already holds older carries
     }
