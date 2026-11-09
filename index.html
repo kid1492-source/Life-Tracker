@@ -164,7 +164,7 @@
   .sum-top .s-val{font-size:13px;font-weight:600;color:var(--muted);}
   .sum-top .s-val.hit{color:var(--pine);}
   .sbar{height:6px;background:var(--track);border-radius:99px;overflow:hidden;}
-  .sbar span{display:block;height:100%;border-radius:99px;width:0;transition:width .25s ease;}
+  .sbar span{display:block;height:100%;border-radius:99px;width:0;transition:width .25s ease;background:var(--pine);}
 
   .rev-week{padding:14px 16px;margin-bottom:10px;}
   .rev-top{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
@@ -174,9 +174,27 @@
   .review-card{padding:14px 16px;}
   .rev-stat{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;font-size:14px;font-weight:600;}
   .rev-stat span:last-child{font-family:'Fraunces',serif;color:#D9A15C;font-size:15px;}
-  .rev-note{width:100%;margin-top:10px;background:#262624;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:13.5px;line-height:1.45;padding:10px;resize:vertical;min-height:62px;box-sizing:border-box;}
-  .rev-note:focus{outline:none;border-color:var(--pine);}
-  .rev-note::placeholder{color:var(--muted);}
+
+  /* ---- Formatted notes (toolbar shows while the note is being edited) ---- */
+  .rt{margin-top:10px;}
+  .rt-bar{display:none;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:7px;}
+  .rt:focus-within .rt-bar{display:flex;}
+  .rt-bar button{min-width:32px;height:32px;padding:0 7px;border:1px solid var(--line);background:#30302E;color:var(--ink);border-radius:8px;font:600 13.5px 'Inter',sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .rt-bar button.on{background:var(--pine-soft);border-color:var(--pine);}
+  .rt-bar button svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;}
+  .rt-bar .sep{width:1px;height:22px;background:var(--line);margin:0 1px;}
+  .rt-bar .sw{width:16px;height:16px;border-radius:50%;display:block;}
+  .rt-bar .hl{width:20px;height:14px;border-radius:3px;display:block;}
+  .rt-ed{min-height:62px;background:#262624;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13.5px;line-height:1.45;color:var(--ink);outline:none;overflow-wrap:anywhere;cursor:text;}
+  .rt-ed:focus{border-color:var(--pine);}
+  .rt-ed.is-empty::before{content:attr(data-ph);color:var(--muted);pointer-events:none;}
+  .rt-ed ul,.rt-view ul,.rt-ed ol,.rt-view ol{margin:4px 0;padding-left:22px;}
+  .rt-view{font-size:13.5px;line-height:1.45;margin-top:8px;overflow-wrap:anywhere;}
+  .rt-view.none{color:var(--muted);font-size:13px;}
+  .ref .rt-view{margin-top:4px;}
+  .edit-link{background:none;border:0;padding:0;margin-left:8px;color:var(--muted);font:600 12px 'Inter',sans-serif;text-decoration:underline;cursor:pointer;}
+  .ref-top{display:flex;align-items:baseline;}
+  .ref-top .edit-link{margin-left:auto;}
 
   .foot{text-align:center;margin-top:22px;font-size:11.5px;color:var(--muted);}
   .saved{opacity:0;transition:opacity .3s;}.saved.show{opacity:1;}
@@ -311,12 +329,31 @@
   </section>
 
   <!-- Daily review -->
-  <section>
+  <section id="dailySec">
     <div class="sec-label"><span class="dot" style="background:#D97757"></span><h2>Daily Review</h2></div>
     <div class="card review-card">
       <div class="mood" id="moodRow"><span data-m="1">😞 Low</span><span data-m="2">😐 Okay</span><span data-m="3">🙂 Good</span><span data-m="4">😄 Great</span></div>
-      <textarea id="dayNote" class="rev-note" style="min-height:90px" placeholder="Reflect on today — wins, misses, what to do tomorrow…"></textarea>
+      <div id="dayNote" data-ph="Reflect on today — wins, misses, what to do tomorrow…" data-min="90"></div>
       <div class="dr-meta"><span>Saved with this day</span><span id="dayNoteCount"></span></div>
+    </div>
+  </section>
+
+  <!-- Weekly review: the week of the selected day -->
+  <section id="weekSec">
+    <div class="sec-label"><span class="dot" style="background:#D97757"></span><h2>Weekly Review</h2></div>
+    <div class="card review-card">
+      <div class="rev-top"><span class="rev-wk" id="wkTitle">Week 1</span><span class="rev-range" id="wkRange"></span><span class="rev-pct" id="wkPct">0%</span></div>
+      <div class="sbar"><span id="wkBar"></span></div>
+      <div id="weekNote" data-ph="This week — what went well, what to adjust…"></div>
+    </div>
+  </section>
+
+  <!-- Monthly review -->
+  <section id="monthSec">
+    <div class="sec-label"><span class="dot" style="background:#D97757"></span><h2>Monthly Review</h2></div>
+    <div class="card review-card">
+      <div class="rev-stat"><span>Completion</span><span id="monthRevPct">0%</span></div>
+      <div id="monthNote" data-ph="How did the month go? Wins, misses, what to change next month…"></div>
     </div>
   </section>
 
@@ -331,16 +368,12 @@
     <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
     <div class="chart"><h3>Habits</h3><p class="sub">Each column is a day.</p><div id="cHabits"></div></div>
     <div class="chart"><h3>Average by weekday</h3><p class="sub">Average completion by day of week, so far this month.</p><div id="cWeekday"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div></div>
-  <!-- Weekly review -->
-  <div class="sum-head"><span class="dot"></span><h2>Weekly Review</h2></div>
-  <div id="weeklyReview"></div>
+    <!-- Read-only: notes are written on the Track tab -->
+    <div class="sum-head"><span class="dot"></span><h2>Weekly Reviews</h2></div>
+    <div id="weeklyView"></div>
 
-  <!-- Monthly review -->
-  <div class="sum-head"><span class="dot"></span><h2>Monthly Review</h2></div>
-  <div class="card review-card">
-    <div class="rev-stat"><span>Completion</span><span id="monthRevPct">0%</span></div>
-    <textarea id="monthNote" class="rev-note" placeholder="How did the month go? Wins, misses, what to change next month…"></textarea>
-  </div>
+    <div class="sum-head"><span class="dot"></span><h2>Monthly Review</h2></div>
+    <div class="card review-card" id="monthView"></div>
 
     <div class="sum-head"><span class="dot"></span><h2>Daily reflections</h2></div>
     <div class="card" id="reflections"></div>
@@ -523,11 +556,13 @@ async function doFlush(){
       const next=pendingDays()[0];
       if(!next) break;
       await pushDay(next);
+      refresh(); // the device copy now holds the cloud's version: show it, so the next edit starts from it
     }
     for(let guard=0;guard<50;guard++){
       const next=pendingReviews()[0];
       if(!next) break;
       await pushReview(next);
+      refresh();
     }
     lastOk=Date.now(); lastError=''; retryMs=0; clearTimeout(retryTimer);
   }catch(e){
@@ -800,7 +835,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 <script>
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const REAL=new Date();
+let REAL=new Date(); // today; updated when the date changes while the app stays open
 let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
 const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal','nSleep10',
@@ -844,29 +879,41 @@ function metric(t){let c=0,n=dim();for(let d=1;d<=n;d++){const o=days[d];if(!o)c
   else if(t.key)c+=(o[t.key]===1?1:0);} return c;}
 
 // ---- persistence ----
-let saveTimer;
-function showSaved(){const m=document.getElementById('savedMsg');m.classList.add('show');setTimeout(()=>m.classList.remove('show'),1100);}
+// Every change is written to the device straight away (no delay), so the device copy and
+// the screen never disagree. The sync layer can then update the device copy at any time
+// and call trackerRefresh, without an older screen copy being written back over it.
+let savedTimer;
+function showSaved(){const m=document.getElementById('savedMsg');m.classList.add('show');clearTimeout(savedTimer);savedTimer=setTimeout(()=>m.classList.remove('show'),1100);}
 async function persist(){return window.storage.set(storeKey(),JSON.stringify({days,review}));}
 window.trackerBeforePull=()=>persist();
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{try{await persist();showSaved();}catch(e){}},250);}
-async function flush(){clearTimeout(saveTimer);try{await persist();}catch(e){}}
+function scheduleSave(){try{persist();showSaved();}catch(e){}}
+async function flush(){try{await persist();}catch(e){}}
 function save(){render();scheduleSave();}
-async function loadMonth(){
-  days={};review={weekly:{},monthly:''};
+async function loadData(){
+  let d={},rv={weekly:{},monthly:''};
   try{const r=await window.storage.get(storeKey());
     if(r&&r.value){const p=JSON.parse(r.value);
-      if(p&&typeof p==='object'&&p.days){days=p.days;review=Object.assign({weekly:{},monthly:''},p.review||{});if(!review.weekly)review.weekly={};}
-      else{days=p||{};}}
+      if(p&&typeof p==='object'&&p.days){d=p.days;rv=Object.assign({weekly:{},monthly:''},p.review||{});if(!rv.weekly)rv.weekly={};}
+      else{d=p||{};}}
   }catch(e){}
   // backward compat: convert old boolean to new three-state
-  Object.values(days).forEach(d=>{if(d){
-    if(d.solat&&Array.isArray(d.solat))d.solat=d.solat.map(v=>v===true?1:(v===false||v==null?0:(Number(v)||0)));
-    BOOL_KEYS.forEach(k=>{if(d[k]===true)d[k]=1;else if(d[k]===false||d[k]===null||d[k]===undefined)d[k]=0;});}});
-  Object.values(days).forEach(d=>{if(d){if(typeof d.note!=='string')d.note='';if(typeof d.mood!=='number')d.mood=0;}});
-  sel=(year===REAL.getFullYear()&&month0===REAL.getMonth())?REAL.getDate():1;
-  buildGrid();buildReview();render();
+  Object.values(d).forEach(o=>{if(o){
+    if(o.solat&&Array.isArray(o.solat))o.solat=o.solat.map(v=>v===true?1:(v===false||v==null?0:(Number(v)||0)));
+    BOOL_KEYS.forEach(k=>{if(o[k]===true)o[k]=1;else if(o[k]===false||o[k]===null||o[k]===undefined)o[k]=0;});
+    if(typeof o.note!=='string')o.note='';if(typeof o.mood!=='number')o.mood=0;}});
+  days=d;review=rv;
 }
-window.trackerRefresh=async function(){const keep=sel;await loadMonth();sel=keep;render();};
+async function loadMonth(){
+  await loadData();
+  sel=(year===REAL.getFullYear()&&month0===REAL.getMonth())?REAL.getDate():1;
+  buildGrid();render();
+}
+// Called by the sync layer after it changes the device copy: reload the data, keep the
+// selected day, and leave any note the user is typing in alone.
+window.trackerRefresh=async function(){
+  await loadData();
+  render(); // note editors skip themselves while they are being typed in
+};
 
 // ---- calendar (rebuilt per month) ----
 const grid=document.getElementById('grid');
@@ -881,37 +928,110 @@ function buildGrid(){
     grid.appendChild(b);
   }
 }
+// ---- formatted notes ----
+// Notes are stored as a small subset of HTML: bold, italic, underline, bullet lists, line
+// breaks, and text / highlight colours. Everything else is removed before it is saved or shown.
+// Older notes are plain text and are shown as-is (line breaks kept).
+const RT_TEXT=[['Default','#F5F3EC'],['Orange','#E8875F'],['Yellow','#F2C14E'],['Green','#7DCB7D'],['Red','#F07070']];
+const RT_HL=[['Yellow','rgba(242, 193, 78, 0.35)'],['Green','rgba(125, 203, 125, 0.32)'],['Red','rgba(240, 112, 112, 0.35)']];
+const RT_TAGS={B:'b',STRONG:'b',I:'i',EM:'i',U:'u',UL:'ul',OL:'ol',LI:'li',BR:'br',DIV:'div',P:'div',SPAN:'span',FONT:'span'};
+const RT_DROP={SCRIPT:1,STYLE:1,TEMPLATE:1,IFRAME:1,OBJECT:1,SVG:1,MATH:1,HEAD:1,TITLE:1,META:1,LINK:1};
+const RT_COLOR=/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\))$/i;
+const RT_IS_HTML=/<\/?(b|i|u|ul|ol|li|br|div|p|span|font|strong|em)\b[^>]*>/i;
+function rtCopy(src,out,colors){
+  src.childNodes.forEach(n=>{
+    if(n.nodeType===3){out.appendChild(document.createTextNode(n.nodeValue));return;}
+    if(n.nodeType!==1||RT_DROP[n.tagName.toUpperCase()])return;
+    const tag=RT_TAGS[n.tagName.toUpperCase()];
+    if(!tag){rtCopy(n,out,colors);return;}               // unknown tag: keep its text
+    const el=document.createElement(tag), st=n.style||{};
+    if(tag!=='br'&&tag!=='ul'&&tag!=='ol'){
+      let c=st.color||(n.tagName.toUpperCase()==='FONT'?(n.getAttribute('color')||''):'');
+      if(colors&&RT_COLOR.test(c))el.style.color=c;
+      if(colors&&RT_COLOR.test(st.backgroundColor||''))el.style.backgroundColor=st.backgroundColor;
+      if(st.fontWeight==='bold'||+st.fontWeight>=600)el.style.fontWeight='bold';
+      if(st.fontStyle==='italic')el.style.fontStyle='italic';
+      if(/underline/.test((st.textDecorationLine||'')+' '+(st.textDecoration||'')))el.style.textDecoration='underline';
+    }
+    rtCopy(n,el,colors);
+    if(tag==='span'&&!el.getAttribute('style')){while(el.firstChild)out.appendChild(el.firstChild);return;}
+    out.appendChild(el);
+  });
+}
+function rtClean(html,colors){
+  const doc=new DOMParser().parseFromString('<body>'+(html||''),'text/html');
+  const out=document.createElement('div');rtCopy(doc.body,out,colors!==false);
+  return out.innerHTML;
+}
+function rtEsc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function rtHtml(v){if(!v)return '';return RT_IS_HTML.test(v)?rtClean(v):rtEsc(v).replace(/\n/g,'<br>');}
+function rtText(v){const d=document.createElement('div');d.innerHTML=rtHtml(v);return d.textContent.trim();}
+function rtView(v,empty){const d=document.createElement('div');d.className='rt-view';
+  if(rtText(v)){d.innerHTML=rtHtml(v);}else{d.classList.add('none');d.textContent=empty||'';}return d;}
+
+const RT_ICON={
+  list:'<svg viewBox="0 0 24 24"><circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><path d="M10 7h10M10 12h10M10 17h10"/></svg>',
+  clear:'<svg viewBox="0 0 24 24"><path d="M6 5h12M12 5l-3 14M5 19l14-14" /></svg>'};
+const rtEditors=[];
+function richEditor(host,onChange){
+  host.classList.add('rt');
+  const bar=document.createElement('div');bar.className='rt-bar';
+  const ed=document.createElement('div');ed.className='rt-ed is-empty';ed.contentEditable='true';
+  ed.dataset.ph=host.dataset.ph||'';ed.setAttribute('role','textbox');ed.setAttribute('aria-multiline','true');ed.setAttribute('aria-label',host.dataset.ph||'Note');
+  if(host.dataset.min)ed.style.minHeight=host.dataset.min+'px';
+  const states=[];
+  // Saved notes always contain a tag, so they are never mistaken for old plain-text notes.
+  const value=()=>{if(!ed.textContent.trim())return '';const h=rtClean(ed.innerHTML);return RT_IS_HTML.test(h)?h:'<div>'+h+'</div>';};
+  const changed=()=>{const v=value();ed.classList.toggle('is-empty',!v&&!ed.querySelector('li'));ed.dataset.v=v;onChange(v);};
+  const refreshState=()=>{states.forEach(([b,c])=>{let on=false;try{on=document.queryCommandState(c);}catch(e){}b.classList.toggle('on',on);});};
+  const cmd=(c,v,css)=>{try{document.execCommand('styleWithCSS',false,!!css);}catch(e){}document.execCommand(c,false,v);};
+  const add=(html,label,fn,state)=>{
+    const b=document.createElement('button');b.type='button';b.tabIndex=-1;b.title=label;b.setAttribute('aria-label',label);b.innerHTML=html;
+    b.addEventListener('mousedown',e=>e.preventDefault());   // keep the text selection
+    b.addEventListener('click',()=>{if(!ed.contains(document.activeElement))ed.focus();fn();changed();refreshState();});
+    if(state)states.push([b,state]);bar.appendChild(b);};
+  const sep=()=>{const x=document.createElement('span');x.className='sep';bar.appendChild(x);};
+  add('<b>B</b>','Bold',()=>cmd('bold'),'bold');
+  add('<i style="font-family:Fraunces,serif">I</i>','Italic',()=>cmd('italic'),'italic');
+  add('<u>U</u>','Underline',()=>cmd('underline'),'underline');
+  add(RT_ICON.list,'Bullet list',()=>cmd('insertUnorderedList'),'insertUnorderedList');
+  sep();
+  RT_TEXT.forEach(([n,c])=>add('<span class="sw" style="background:'+c+'"></span>',n+' text',()=>cmd('foreColor',c,true)));
+  sep();
+  RT_HL.forEach(([n,c])=>add('<span class="hl" style="background:'+c+';border:1px solid '+c.replace(/[\d.]+\)$/,'0.9)')+'"></span>',n+' highlight',()=>cmd('hiliteColor',c,true)));
+  sep();
+  add(RT_ICON.clear,'Clear formatting',()=>cmd('removeFormat'));
+  ed.addEventListener('input',changed);
+  ed.addEventListener('paste',e=>{           // pasted text keeps bold/italic/underline/lists, not outside colours
+    e.preventDefault();const cd=e.clipboardData;if(!cd)return;
+    const h=cd.getData('text/html'),t=cd.getData('text/plain');
+    document.execCommand('insertHTML',false,h?rtClean(h,false):rtEsc(t).replace(/\n/g,'<br>'));});
+  document.addEventListener('selectionchange',()=>{if(ed.contains(document.activeElement)||document.activeElement===ed)refreshState();});
+  host.appendChild(bar);host.appendChild(ed);
+  const api={ed,
+    set(v){v=v||'';if(document.activeElement===ed)return;  // never replace what is being typed
+      if(ed.dataset.v===v)return;ed.innerHTML=rtHtml(v);ed.dataset.v=v;ed.classList.toggle('is-empty',!rtText(v));}};
+  rtEditors.push(api);return api;
+}
+
 // ---- weekly & monthly review ----
 function weeksInMonth(){return Math.ceil(dim()/7);}
-function buildReview(){
-  const host=document.getElementById('weeklyReview');host.innerHTML='';
-  const n=dim(),weeks=weeksInMonth(),mon=MONTHS[month0].slice(0,3);
-  for(let w=0;w<weeks;w++){
-    const s=w*7+1,e=Math.min(n,(w+1)*7);
-    const card=document.createElement('div');card.className='card rev-week';
-    card.innerHTML=`<div class="rev-top"><span class="rev-wk">Week ${w+1}</span><span class="rev-range">${mon} ${s}–${e}</span><span class="rev-pct" id="wpct${w}">0%</span></div>
-      <div class="sbar"><span id="wbar${w}"></span></div>
-      <textarea class="rev-note" id="wnote${w}" placeholder="Week ${w+1} — what went well, what to adjust…"></textarea>`;
-    host.appendChild(card);
-    const ta=card.querySelector('textarea');
-    ta.value=(review.weekly&&review.weekly[w])||'';
-    ta.addEventListener('input',()=>{review.weekly[w]=ta.value;scheduleSave();});
-  }
-  const mn=document.getElementById('monthNote');
-  mn.value=review.monthly||'';
-  mn.oninput=()=>{review.monthly=mn.value;scheduleSave();};
-}
+function weekOf(d){return Math.floor((d-1)/7);}
+function weekRange(w){return [w*7+1,Math.min(dim(),(w+1)*7)];}
+function weekPct(w){const [s,e]=weekRange(w);let tot=0;for(let d=s;d<=e;d++)tot+=dayPoints(days[d]);return Math.round(tot/(MAX*(e-s+1))*100);}
+const dayEd=richEditor(document.getElementById('dayNote'),v=>{dayObj(sel).note=v;
+  document.getElementById('dayNoteCount').textContent=rtText(v).length?(rtText(v).length+' chars'):'';scheduleSave();});
+const weekEd=richEditor(document.getElementById('weekNote'),v=>{if(!review.weekly)review.weekly={};review.weekly[weekOf(sel)]=v;scheduleSave();});
+const monthEd=richEditor(document.getElementById('monthNote'),v=>{review.monthly=v;scheduleSave();});
 function renderReview(){
-  const n=dim(),weeks=weeksInMonth();
-  for(let w=0;w<weeks;w++){
-    const s=w*7+1,e=Math.min(n,(w+1)*7);let tot=0,cnt=0;
-    for(let d=s;d<=e;d++){tot+=dayPoints(days[d]);cnt++;}
-    const pct=cnt?Math.round(tot/(MAX*cnt)*100):0;
-    const p=document.getElementById('wpct'+w),b=document.getElementById('wbar'+w);
-    if(p)p.textContent=pct+'%'; if(b)b.style.width=pct+'%';
-  }
-  const mr=document.getElementById('monthRevPct');
-  if(mr)mr.textContent=document.getElementById('monthPct').textContent;
+  const w=weekOf(sel),[s,e]=weekRange(w),pct=weekPct(w);
+  document.getElementById('wkTitle').textContent='Week '+(w+1);
+  document.getElementById('wkRange').textContent=MONTHS[month0].slice(0,3)+' '+s+'–'+e;
+  document.getElementById('wkPct').textContent=pct+'%';
+  document.getElementById('wkBar').style.width=pct+'%';
+  weekEd.set(review.weekly&&review.weekly[w]);
+  monthEd.set(review.monthly);
+  document.getElementById('monthRevPct').textContent=document.getElementById('monthPct').textContent;
 }
 
 const pc=document.getElementById('prayers');
@@ -982,8 +1102,8 @@ function render(){
   // daily review
   const MOODS=['','Low','Okay','Good','Great'];
   document.querySelectorAll('#moodRow span').forEach(b=>b.classList.toggle('on',+b.dataset.m===o.mood));
-  const dn=document.getElementById('dayNote');if(dn.value!==(o.note||'')&&document.activeElement!==dn)dn.value=o.note||'';
-  document.getElementById('dayNoteCount').textContent=(o.note||'').length?(o.note.length+' chars'):'';
+  dayEd.set(o.note);
+  const nl=rtText(o.note).length;document.getElementById('dayNoteCount').textContent=nl?(nl+' chars'):'';
   // month ring
   let tot=0;for(let d=1;d<=n;d++)tot+=dayPoints(days[d]);
   const mpct=Math.round(tot/(MAX*n)*100);
@@ -996,7 +1116,6 @@ function render(){
     bEl.style.width=pct+'%';bEl.style.background=t.hue==='amber'?'var(--amber)':'var(--pine)';});
   renderReview();
 }
-document.getElementById('dayNote').addEventListener('input',e=>{dayObj(sel).note=e.target.value;document.getElementById('dayNoteCount').textContent=e.target.value.length?(e.target.value.length+' chars'):'';scheduleSave();});
 document.querySelectorAll('#moodRow span').forEach(b=>b.addEventListener('click',()=>{const o=dayObj(sel),m=+b.dataset.m;o.mood=o.mood===m?0:m;save();}));
 // save-day bar pinned to the bottom of the screen
 const saveBar=document.createElement('div');
@@ -1041,6 +1160,9 @@ function elapsedDays(){const n=dim();
   return before?n:0;}
 function dayLabel(d){return dow(d)+' '+d+' '+MONTHS[month0].slice(0,3);}
 
+function editLink(d,secId){const b=document.createElement('button');b.type='button';b.className='edit-link';b.textContent='Edit';
+  b.onclick=()=>{if(d)sel=d;window.trackerSetView('track');render();
+    const el=document.getElementById(secId);if(el)window.scrollTo({top:el.offsetTop-14});};return b;}
 function renderDashboard(){
   const n=dim(),e=elapsedDays();
   const pts=[];for(let d=1;d<=n;d++)pts.push(dayPoints(days[d]));
@@ -1058,12 +1180,31 @@ function renderDashboard(){
     const b=document.createElement('div');b.className='kl';b.textContent=l;d.appendChild(a);d.appendChild(b);k.appendChild(d);});
   document.getElementById('dailySub').textContent=e?('% of daily goals done · '+goodDays+' of '+e+' days at 70%+ · dashed = average'):'No days yet this month.';
 
+  // --- Weekly reviews (read-only) ---
+  const wv=document.getElementById('weeklyView');wv.innerHTML='';
+  for(let w=0;w<weeksInMonth();w++){const [s,en]=weekRange(w),started=s<=e,pct=started?weekPct(w):0;
+    const c=document.createElement('div');c.className='card rev-week';
+    const t=document.createElement('div');t.className='rev-top';
+    [['rev-wk','Week '+(w+1)],['rev-range',MONTHS[month0].slice(0,3)+' '+s+'–'+en],['rev-pct',started?pct+'%':'—']].forEach(([k,x])=>{const sp=document.createElement('span');sp.className=k;sp.textContent=x;t.appendChild(sp);});
+    t.appendChild(editLink(Math.min(Math.max(s,Math.min(e||1,en)),en),'weekSec'));
+    const sb=document.createElement('div');sb.className='sbar';const sbi=document.createElement('span');sbi.style.width=pct+'%';sb.appendChild(sbi);
+    c.appendChild(t);c.appendChild(sb);c.appendChild(rtView(review.weekly&&review.weekly[w],'No note for this week.'));wv.appendChild(c);}
+  // --- Monthly review (read-only) ---
+  const mv=document.getElementById('monthView');mv.innerHTML='';
+  const ms=document.createElement('div');ms.className='rev-stat';
+  const ml=document.createElement('span');ml.textContent='Completion';const mp=document.createElement('span');mp.textContent=document.getElementById('monthPct').textContent;
+  ms.appendChild(ml);ms.appendChild(mp);mv.appendChild(ms);
+  mv.appendChild(rtView(review.monthly,'No monthly review yet.'));
+  const me=editLink(null,'monthSec');me.style.marginLeft='0';me.style.marginTop='8px';mv.appendChild(me);
+
   // --- Daily reflections ---
   const rf=document.getElementById('reflections');rf.innerHTML='';let any=false;
-  for(let d=n;d>=1;d--){const o=days[d];if(!o||!(o.note&&o.note.trim())&&!o.mood)continue;any=true;
-    const r=document.createElement('div');r.className='ref';const a=document.createElement('span');a.className='d';a.textContent=dow(d)+' '+d;
+  for(let d=n;d>=1;d--){const o=days[d];const has=o&&rtText(o.note);if(!o||!has&&!o.mood)continue;any=true;
+    const r=document.createElement('div');r.className='ref';const top=document.createElement('div');top.className='ref-top';
+    const a=document.createElement('span');a.className='d';a.textContent=dow(d)+' '+d;
     const m=document.createElement('span');m.className='m';m.textContent=[['','😞 Low','😐 Okay','🙂 Good','😄 Great'][o.mood||0],Math.round(dayPoints(o)/MAX*100)+'%'].filter(Boolean).join(' · ');
-    r.appendChild(a);r.appendChild(m);if(o.note&&o.note.trim()){const p=document.createElement('p');p.textContent=o.note;r.appendChild(p);}rf.appendChild(r);}
+    top.appendChild(a);top.appendChild(m);top.appendChild(editLink(d,'dailySec'));r.appendChild(top);
+    if(has)r.appendChild(rtView(o.note));rf.appendChild(r);}
   if(!any){const r=document.createElement('div');r.className='ref empty';r.textContent='No reflections yet. Add one in Daily Review on any day.';rf.appendChild(r);}
 
   // --- Daily points column chart ---
@@ -1135,9 +1276,24 @@ function renderDashboard(){
   function setView(v){const on=v==='dash';document.body.classList.toggle('dashmode',on);tD.classList.toggle('on',on);tT.classList.toggle('on',!on);
     document.getElementById('saveBar').style.display=on?'none':'';
     try{localStorage.setItem('view',v);}catch(e){}if(on)renderDashboard();window.scrollTo(0,0);}
-  tT.onclick=()=>setView('track');tD.onclick=()=>setView('dash');
+  tT.onclick=()=>setView('track');tD.onclick=()=>setView('dash');window.trackerSetView=setView;
   const baseR=render;render=function(){baseR();if(document.body.classList.contains('dashmode'))renderDashboard();};
 })();
+
+// New day while the app stayed open (phones keep it in the background): move "today" on.
+// If the user was looking at the old today, select the new today, changing month if needed.
+function checkDate(){
+  const now=new Date();
+  if(now.toDateString()===REAL.toDateString())return;
+  const wasToday=year===REAL.getFullYear()&&month0===REAL.getMonth()&&sel===REAL.getDate();
+  REAL=now;
+  if(!wasToday){render();return;}
+  if(year!==now.getFullYear()||month0!==now.getMonth()){
+    flush().then(()=>{year=now.getFullYear();month0=now.getMonth();loadMonth();});
+  } else {sel=now.getDate();render();}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDate();});
+setInterval(checkDate,60000);
 
 // Load this month at startup so today is selected (not day 1), before sign-in finishes.
 loadMonth();
