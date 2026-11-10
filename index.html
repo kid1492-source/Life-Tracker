@@ -228,6 +228,17 @@
   .test input:focus{outline:none;border-bottom-color:var(--pine);}
   .trow.done .test input{color:var(--muted);}
   .task-hd .tt{color:#D9A15C;}
+  .trp{flex:none;background:none;border:0;padding:2px 2px;margin-top:1px;color:var(--muted);font:inherit;font-size:14px;line-height:1.4;cursor:pointer;white-space:nowrap;opacity:.6;}
+  .trp.on{color:#D9A15C;font-size:12.5px;font-weight:700;opacity:1;}
+  .trep{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:4px 14px 12px 46px;border-bottom:1px solid var(--line);}
+  .trep .lbl{width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:1px;}
+  .trep .lbl b{color:#D9A15C;font-weight:700;}
+  .trep button,.trep label{background:#30302E;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .trep label{display:inline-flex;align-items:center;gap:6px;}
+  .trep input[type=date]{background:none;border:0;color:var(--ink);font:inherit;font-size:12.5px;color-scheme:dark;}
+  .trep button.stop{color:#F07070;border-color:#5a3b3b;}
+  .trow.skip .ttxt{color:var(--muted)!important;opacity:.55;}
+  .tskip{flex:none;margin-top:3px;font-size:12px;font-style:italic;color:var(--muted);}
   .tclr{flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;border:2px solid #4A4942;background:none;padding:0;cursor:pointer;}
   .tclr.set{border-color:transparent;}
   .tpal{display:flex;gap:10px;align-items:center;padding:4px 14px 12px 46px;border-bottom:1px solid var(--line);}
@@ -1184,7 +1195,8 @@ saveBtn.onclick=async()=>{
 
 // ---- Tasks ----
 // Stored per day as o.tasks = {deep:[{id,t,d,c,k,e}], quick:[...], pocket:[...], carried:1}.
-// t = text, d = done (0/1), c = carried over from an earlier day. A day with no tasks
+// t = text, d = done (0/1), c = carried over from an earlier day, k = colour, e = time,
+// r = repeats daily {s,u}, sk = skipped today. A day with no tasks
 // field was never set up. When today is opened, unfinished tasks from earlier days are
 // copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
 const TASK_COLS=[['deep','MITs · Deep work','Most important, needs focus'],['quick','Quick wins','Less important, but quick'],['pocket','Pocket Task','Not urgent, do in spare moments']];
@@ -1207,11 +1219,53 @@ function pruneEmptyTasks(){
     if(k.length!==l.length){o.tasks[c]=k;changed=true;}});
   return changed;
 }
+// Repeating tasks: it.r = {s:start, u:until} as YYYY-MM-DD. They come back every day,
+// unticked, until the end date. it.sk = skipped for that day only.
+const isoOf=(y,m0,d)=>{const t=new Date(y,m0,d);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');};
+const selIso=()=>isoOf(year,month0,sel);
+const isoDate=iso=>{const[a,b,c]=iso.split('-').map(Number);return new Date(a,b-1,c);};
+const isoAdd=(iso,n)=>{const t=isoDate(iso);return isoOf(t.getFullYear(),t.getMonth(),t.getDate()+n);};
+const fmtIso=iso=>{const t=isoDate(iso);return DOW[t.getDay()]+' '+t.getDate()+' '+MONTHS[t.getMonth()].slice(0,3);};
+let taskRep='';  // task whose repeat choices are open
+function repeatPanel(c,it){
+  const p=document.createElement('div');p.className='trep';
+  const lbl=document.createElement('div');lbl.className='lbl';
+  if(it.r){lbl.innerHTML='Repeats daily until <b></b>';lbl.querySelector('b').textContent=fmtIso(it.r.u);}
+  else lbl.textContent='Repeat daily for';
+  p.appendChild(lbl);
+  const setUntil=u=>{const x=findTask(c,it.id);if(!x)return;
+    x.r={s:(x.r&&x.r.s)||selIso(),u};delete x.sk;taskRep='';save();renderTasks(true);};
+  [['1 week',7],['2 weeks',14],['4 weeks',28]].forEach(([t,n])=>{
+    const b=document.createElement('button');b.type='button';b.textContent=t;
+    b.onclick=()=>setUntil(isoAdd((it.r&&it.r.s)||selIso(),n-1));p.appendChild(b);
+  });
+  const l=document.createElement('label');l.append('Until');
+  const di=document.createElement('input');di.type='date';di.min=selIso();if(it.r)di.value=it.r.u;
+  di.onchange=()=>{if(di.value)setUntil(di.value);};
+  l.appendChild(di);p.appendChild(l);
+  if(it.r){const b=document.createElement('button');b.type='button';b.className='stop';b.textContent='Stop repeating';
+    b.onclick=()=>{const x=findTask(c,it.id);if(!x)return;delete x.r;delete x.sk;taskRep='';save();renderTasks(true);};p.appendChild(b);}
+  return p;
+}
+// "↻ 5/7": days ticked out of days so far (start date to the day shown, within the end date;
+// skipped days left out).
+async function fillRepeatStats(btn,id,r){
+  const end=selIso()<r.u?selIso():r.u;let done=0,total=0;const cache={};
+  for(let iso=r.s;iso<=end&&total<400;iso=isoAdd(iso,1)){
+    const t=isoDate(iso),mk=t.getFullYear()+'-'+t.getMonth();
+    if(!cache[mk])cache[mk]=await readMonthDays(t.getFullYear(),t.getMonth());
+    const T=(cache[mk][t.getDate()]||{}).tasks||{};
+    let x=null;TASK_COLS.forEach(([c])=>{(T[c]||[]).forEach(y=>{if(y&&y.id===id)x=y;});});
+    if(x&&x.sk)continue;                                          // skipped days don't count
+    total++;if(x&&x.d)done++;
+  }
+  if(btn.isConnected&&total)btn.textContent='↻ '+done+'/'+total;
+}
 function taskRow(c,it){
-  const r=document.createElement('div');r.className='trow'+(it.d?' done':'');r.dataset.id=it.id;
+  const r=document.createElement('div');r.className='trow'+(it.d?' done':'')+(it.sk?' skip':'');r.dataset.id=it.id;
   const chk=document.createElement('button');chk.type='button';chk.className='tchk';chk.setAttribute('aria-label','Mark done');
   chk.innerHTML='<svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg>';
-  chk.onclick=()=>{const x=findTask(c,it.id);if(!x||!String(x.t||'').trim())return;x.d=x.d?0:1;save();renderTasks(true);};
+  chk.onclick=()=>{const x=findTask(c,it.id);if(!x||x.sk||!String(x.t||'').trim())return;x.d=x.d?0:1;save();renderTasks(true);};
   r.appendChild(chk);
   if(it.c){const m=document.createElement('span');m.className='tcar';m.textContent='↪';m.title='Carried over from an earlier day';r.appendChild(m);}
   const inp=document.createElement('textarea');inp.rows=1;inp.className='ttxt';inp.maxLength=200;inp.value=it.t||'';inp.placeholder='New task';
@@ -1228,13 +1282,24 @@ function taskRow(c,it){
   const sizeEst=()=>{ei.style.width=(Math.max((ei.value||'time').length,2)+0.6)+'ch';};sizeEst();
   ei.addEventListener('input',sizeEst);ei.addEventListener('blur',()=>setTimeout(sizeEst,0));
   est.append('(',ei,')');
-  r.appendChild(est);
+  if(it.sk){const k=document.createElement('span');k.className='tskip';k.textContent='skipped today';r.appendChild(k);}
+  else r.appendChild(est);
+  const rp=document.createElement('button');rp.type='button';rp.className='trp'+(it.r?' on':'');rp.textContent='↻';
+  rp.setAttribute('aria-label',it.r?'Repeats daily until '+fmtIso(it.r.u):'Repeat daily');
+  rp.onclick=()=>{taskRep=taskRep===it.id?'':it.id;taskPal='';renderTasks(true);};
+  if(it.r)fillRepeatStats(rp,it.id,it.r);
+  r.appendChild(rp);
   const clr=document.createElement('button');clr.type='button';clr.className='tclr'+(it.k?' set':'');clr.setAttribute('aria-label','Text colour');
   if(it.k)clr.style.background=it.k;
-  clr.onclick=()=>{taskPal=taskPal===it.id?'':it.id;renderTasks(true);};
+  clr.onclick=()=>{taskPal=taskPal===it.id?'':it.id;taskRep='';renderTasks(true);};
   r.appendChild(clr);
-  const del=document.createElement('button');del.type='button';del.className='tdel';del.textContent='×';del.setAttribute('aria-label','Delete task');
-  del.onclick=()=>{const T=dayTasks(dayObj(sel));T[c]=T[c].filter(x=>x.id!==it.id);save();renderTasks(true);};
+  // × deletes; on a repeating task it skips today only (tap again to undo).
+  const del=document.createElement('button');del.type='button';del.className='tdel';
+  del.textContent=it.sk?'↶':'×';del.setAttribute('aria-label',it.r?(it.sk?'Undo skip':'Skip today'):'Delete task');
+  del.onclick=()=>{const T=dayTasks(dayObj(sel));
+    if(it.r){const x=findTask(c,it.id);if(!x)return;if(x.sk)delete x.sk;else{x.sk=1;x.d=0;}}
+    else T[c]=T[c].filter(x=>x.id!==it.id);
+    save();renderTasks(true);};
   r.appendChild(del);
   return r;
 }
@@ -1264,7 +1329,7 @@ function taskPalette(c,it){
 const taskSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel].tasks)||null);
 function renderTasks(force){
   const key=storeKey()+':'+sel;
-  if(taskShown!==key){taskShown=key;taskPal='';carryTasks();}
+  if(taskShown!==key){taskShown=key;taskPal='';taskRep='';carryTasks();}
   const sig=taskSigNow();
   if(!force&&sig===taskSig)return;
   if(!force&&taskGrid.contains(document.activeElement))return; // don't redraw while typing
@@ -1279,7 +1344,7 @@ function renderTasks(force){
     col.dataset.c=c;
     hd.querySelector('.t').textContent=title;hd.querySelector('.s').textContent=sub;
     col.appendChild(hd);
-    list.forEach(it=>{col.appendChild(taskRow(c,it));if(taskPal===it.id)col.appendChild(taskPalette(c,it));});
+    list.forEach(it=>{col.appendChild(taskRow(c,it));if(taskPal===it.id)col.appendChild(taskPalette(c,it));if(taskRep===it.id)col.appendChild(repeatPanel(c,it));});
     const add=document.createElement('button');add.type='button';add.className='tadd';add.textContent='+ Add task';
     add.onclick=()=>addTask(c,null);
     col.appendChild(add);
@@ -1292,7 +1357,7 @@ function renderTasks(force){
 function updateTaskHeads(){
   const T=(days[sel]&&days[sel].tasks)||{};
   taskGrid.querySelectorAll('.task-col').forEach(col=>{
-    const list=Array.isArray(T[col.dataset.c])?T[col.dataset.c]:[],done=list.filter(x=>x.d).length;
+    const list=(Array.isArray(T[col.dataset.c])?T[col.dataset.c]:[]).filter(x=>!x.sk),done=list.filter(x=>x.d).length;
     const left=list.reduce((a,x)=>a+(!x.d&&parseMins(x.e)||0),0);
     const n=col.querySelector('.task-hd .n');n.textContent=list.length?(done+' / '+list.length):'';
     if(left){const tt=document.createElement('span');tt.className='tt';tt.textContent=' · ~'+fmtMins(left);n.appendChild(tt);}
@@ -1320,7 +1385,7 @@ async function carryTasks(){
   if(!carryReady||carrying)return;
   const y0=year,m0=month0;
   if(y0!==REAL.getFullYear()||m0!==REAL.getMonth())return;
-  const td=REAL.getDate();
+  const td=REAL.getDate(),tIso=isoOf(y0,m0,td);
   if(days[td]&&days[td].tasks&&days[td].tasks.carried)return;
   carrying=true;
   try{
@@ -1333,6 +1398,7 @@ async function carryTasks(){
       if(!p||!p.tasks)continue;
       TASK_COLS.forEach(([c])=>(p.tasks[c]||[]).forEach(it=>{
         if(!it||!it.id||seen.has(it.id))return;seen.add(it.id);    // newest copy of each task wins
+        if(it.r){if(tIso<=it.r.u&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,r:it.r},it.k?{k:it.k}:{},it.e?{e:it.e}:{}));return;}
         if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{},it.e?{e:it.e}:{}));
       }));
       if(p.tasks.carried)break;                                    // that day already holds older carries
