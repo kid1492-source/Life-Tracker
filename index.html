@@ -207,8 +207,9 @@
   .task-hd{padding:0 14px 10px;border-bottom:1px solid var(--line);}
   .task-hd .t{font-size:13.5px;font-weight:700;}
   .task-hd .s{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;}
-  .task-col.deep .task-hd .t{color:#D9A15C;}
-  .task-col.quick .task-hd .t{color:var(--pine);}
+  .task-col.deep .task-hd .t{color:#F07070;font-size:20px;font-weight:800;letter-spacing:-.01em;}
+  .task-col.quick .task-hd .t{color:#F2C14E;font-size:15.5px;}
+  .task-col.pocket .task-hd .t{color:#7DCB7D;}
   .task-hd .n{float:right;font-family:'Fraunces',serif;font-size:13px;font-weight:600;color:var(--muted);margin-left:6px;}
   .trow{display:flex;align-items:flex-start;gap:10px;padding:9px 8px 9px 14px;border-bottom:1px solid var(--line);}
   .tchk{margin-top:1px;width:22px;height:22px;border-radius:6px;border:2px solid #4A4942;background:none;padding:0;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -1182,11 +1183,11 @@ saveBtn.onclick=async()=>{
 };
 
 // ---- Tasks ----
-// Stored per day as o.tasks = {deep:[{id,t,d,c}], quick:[...], carried:1}.
+// Stored per day as o.tasks = {deep:[{id,t,d,c,k,e}], quick:[...], pocket:[...], carried:1}.
 // t = text, d = done (0/1), c = carried over from an earlier day. A day with no tasks
 // field was never set up. When today is opened, unfinished tasks from earlier days are
 // copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
-const TASK_COLS=[['deep','MITs · Deep work','Most important, needs focus'],['quick','Quick wins','Less important, but quick']];
+const TASK_COLS=[['deep','MITs · Deep work','Most important, needs focus'],['quick','Quick wins','Less important, but quick'],['pocket','Pocket Task','Not urgent, do in spare moments']];
 const taskGrid=document.getElementById('taskGrid');
 const newTaskId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function dayTasks(o){if(!o.tasks||typeof o.tasks!=='object')o.tasks={};
