@@ -299,6 +299,37 @@
   .prow .f{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .prow .f.q{color:var(--muted);}
   .prow button{background:none;border:0;color:var(--muted);font-size:16px;line-height:1;padding:2px 6px;cursor:pointer;}
+
+  /* ---- Sync gate: covers the page while this device fetches the latest data ---- */
+  #syncGate{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,20,19,.82);backdrop-filter:blur(2px);}
+  #syncGate.on{display:flex;}
+  #syncGate .box{max-width:320px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 18px;text-align:center;box-shadow:var(--shadow);}
+  #syncGate .spin{width:26px;height:26px;margin:0 auto 12px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--pine);animation:sgspin .8s linear infinite;}
+  @keyframes sgspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){#syncGate .spin{animation:none}}
+  #syncGate .t{font-size:15px;font-weight:700;color:var(--ink);}
+  #syncGate .s{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45;}
+  #syncGate .acts{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+  #syncGate button{background:#3A3935;border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:8px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+  #syncGate button.main{background:var(--pine);border-color:var(--pine);color:#fff;}
+
+  /* ---- Day history ---- */
+  .dh-hist{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;font-weight:600;text-decoration:underline;cursor:pointer;padding:0 0 0 10px;}
+  #histPanel{position:fixed;inset:0;z-index:900;display:none;background:rgba(20,20,19,.82);padding:24px 14px;overflow-y:auto;}
+  #histPanel.on{display:block;}
+  #histPanel .box{max-width:560px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);}
+  #histPanel .hd{display:flex;align-items:baseline;gap:10px;padding:16px 16px 12px;border-bottom:1px solid var(--line);}
+  #histPanel .hd .t{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:#D9A15C;}
+  #histPanel .hd .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;}
+  #histPanel .note{padding:10px 16px;font-size:12.5px;color:var(--muted);line-height:1.45;border-bottom:1px solid var(--line);}
+  .hv{padding:12px 16px;border-bottom:1px solid var(--line);}
+  .hv:last-child{border-bottom:0;}
+  .hv .when{font-size:14px;font-weight:700;color:var(--ink);}
+  .hv .when span{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px;}
+  .hv .sum{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45;}
+  .hv .dif{font-size:12.5px;color:#D9A15C;margin-top:3px;line-height:1.45;}
+  .hv button{margin-top:8px;background:#3A3935;border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .hv button.sure{background:var(--pine);border-color:var(--pine);color:#fff;}
 </style>
 </head>
 <body>
@@ -336,6 +367,7 @@
     <span class="dh-day" id="dhDay">Wed 1</span>
     <span class="dh-dow" id="dhDow">1 July</span>
     <span class="dh-pts" id="dhPts">0 / 15 done</span>
+    <button class="dh-hist" id="dhHist" type="button">History</button>
   </div>
 
   <section>
@@ -916,15 +948,75 @@ function adoptAnon(cloud){
 
 function refresh(){ if(typeof window.trackerRefresh==='function') window.trackerRefresh(); }
 
+// ---- sync gate: before this device can be edited, fetch the latest data ----
+// Shown on opening (when a session is saved) and when the app comes back after a while,
+// so a device never builds on an old copy. If the cloud can't be reached, the person can
+// retry or carry on with this device's copy (uploads still merge safely).
+let gateEl=null,gateOn=false,gateTimer=null,hiddenAt=0;
+function gateShow(state){
+  if(!gateEl){
+    gateEl=document.createElement('div');gateEl.id='syncGate';gateEl.setAttribute('role','alertdialog');gateEl.setAttribute('aria-live','polite');
+    document.body.appendChild(gateEl);
+  }
+  gateOn=true;gateEl.classList.add('on');
+  if(state==='busy'){
+    gateEl.innerHTML='<div class="box"><div class="spin"></div><div class="t">Updating…</div><div class="s">Getting your latest entries before you edit.</div></div>';
+  }else{
+    gateEl.innerHTML='<div class="box"><div class="t">Can\'t reach the cloud</div>'
+      +'<div class="s">This device may be showing an older copy. Try again, or continue: your changes will be merged safely when the connection is back.</div>'
+      +'<div class="acts"><button class="main" type="button">Try again</button><button type="button">Continue anyway</button></div></div>';
+    const [retry,go]=gateEl.querySelectorAll('button');
+    retry.onclick=()=>gatedSync();
+    go.onclick=()=>gateHide();
+  }
+}
+function gateHide(){gateOn=false;clearTimeout(gateTimer);if(gateEl)gateEl.classList.remove('on');}
+async function gatedSync(){
+  if(!user){gateHide();return;}
+  gateShow('busy');
+  clearTimeout(gateTimer);
+  gateTimer=setTimeout(()=>{if(gateOn)gateShow('fail');},10000);   // no answer in 10 s: offer the choice
+  let ok=true;
+  try{
+    if(typeof window.trackerBeforePull==='function'){try{await window.trackerBeforePull();}catch(e){}}
+    await pull();lastError='';
+  }catch(e){ok=false;lastError=(e&&e.message)||String(e);}
+  refresh();setStatus();
+  if(ok)gateHide();else gateShow('fail');
+  flush();
+}
+// Earlier versions of one day, newest first, plus what is saved now.
+async function dayHistory(day){
+  if(!user)throw new Error('Sign in to see history');
+  const [h,cur]=await Promise.all([
+    sb.from('tracker_days_history').select('data,replaced_at').eq('day',day).order('replaced_at',{ascending:false}).limit(300),
+    sb.from('tracker_days').select('data,updated_at').eq('day',day).maybeSingle()]);
+  if(h.error)throw h.error;if(cur.error)throw cur.error;
+  return {versions:h.data||[],current:cur.data||null};
+}
+// Put an earlier version back. The version it replaces goes into history, so this can be undone.
+async function restoreDay(day,data){
+  if(!user)throw new Error('Sign in to restore');
+  const {data:saved,error}=await sb.from('tracker_days').upsert({user_id:user.id,day,data},{onConflict:'user_id,day'}).select('data').single();
+  if(error)throw error;
+  const mk=day.slice(0,7),d=String(parseInt(day.slice(8,10),10)),confirmed=norm(saved&&saved.data);
+  const b=readBase(mk);b.days[d]=confirmed;writeBase(mk,b);
+  const c=readCache(mk);c.days[d]=confirmed;writeCache(mk,c);
+  refresh();setStatus();
+}
+
 async function onSignedIn(){
+  gateShow('busy');
   try{
     const {cloud}=await pull();
     const a=adoptAnon(cloud);
     adoptAnonPlan();
     if(a.conflicts.length) addNotice('account','kept the cloud value for '+a.conflicts.length+' field(s) that were set differently on this device (backup kept on this device): '+a.conflicts.slice(0,3).join(', '));
     lastError='';
+    gateHide();
   }catch(e){
     lastError=(e&&e.message)||String(e);
+    gateShow('fail');
   }
   refresh();
   await flush();
@@ -1054,6 +1146,9 @@ window.trackerPlan={
 
 window.trackerSync={
   signedIn:()=>!!user,
+  history:dayHistory,
+  restoreDay,
+  canon,
   syncNow,
   pending:pendingCount,
   notices:getNotices,
@@ -1064,7 +1159,12 @@ window.trackerSync={
 migrateLegacy();
 bar=document.createElement('div');
 bar.style.cssText='max-width:560px;margin:10px auto 0;padding:10px 14px;font:13px Inter,system-ui,sans-serif;color:#aaa;display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
-document.addEventListener('DOMContentLoaded',()=>{document.body.prepend(bar);renderBar();});
+document.addEventListener('DOMContentLoaded',()=>{
+  document.body.prepend(bar);renderBar();
+  // A saved sign-in means the first download is on its way: hold edits until it lands.
+  if(!user&&ls.keys().some(k=>/^sb-.*-auth-token$/.test(k)))gateShow('busy');
+  setTimeout(()=>{if(gateOn&&!user)gateHide();},12000);   // sign-in never resolved: don't block
+});
 
 sb.auth.onAuthStateChange(async(ev,session)=>{
   const prev=user?user.id:null;
@@ -1072,13 +1172,14 @@ sb.auth.onAuthStateChange(async(ev,session)=>{
   const now=user?user.id:null;
   if(now!==prev){
     renderBar();
-    if(user) await onSignedIn(); else refresh();
+    if(user) await onSignedIn(); else {gateHide();refresh();}
   }
   setStatus();
 });
 
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden) flush(); else syncNow();
+  if(document.hidden){hiddenAt=Date.now();flush();return;}
+  if(user&&hiddenAt&&Date.now()-hiddenAt>=20000) gatedSync(); else syncNow();
 });
 window.addEventListener('online',()=>syncNow());
 
@@ -1815,6 +1916,91 @@ woHost.addEventListener('focusout',()=>setTimeout(()=>{
 },0));
 const baseWoRender=render;
 render=function(){baseWoRender();renderWorkout();};
+
+// ---- Day history: earlier versions of the selected day, with restore ----
+const HIST_NAMES={solat:'Solat',solatNotes:'Prayer notes',protein:'Protein',pLog:'Protein entries',tasks:'Tasks',
+  workout:'Workout log',note:'Note',planNote:'Plan',mood:'Mood'};
+const histKnown=()=>new Set([...Object.keys(blankDay()),...BOOL_KEYS,...Object.keys(HIST_NAMES)]);
+function histLabel(k){const g=document.querySelector('.row[data-key="'+k+'"] .goal');return g?g.textContent.trim():(HIST_NAMES[k]||k);}
+function histSummary(d){
+  d=d||{};
+  const ticks=BOOL_KEYS.filter(k=>d[k]===1).length+(Array.isArray(d.solat)?d.solat.filter(v=>v===1).length:0);
+  let tasks=0,tdone=0;
+  if(d.tasks&&typeof d.tasks==='object')Object.keys(d.tasks).forEach(c=>{if(Array.isArray(d.tasks[c]))d.tasks[c].forEach(x=>{if(x&&String(x.t||'').trim()){tasks++;if(x.d)tdone++;}});});
+  const ex=d.workout&&Array.isArray(d.workout.items)?d.workout.items.filter(x=>String(x.n||'').trim()).length:0;
+  const bits=[ticks+' ticked'];
+  if(tasks)bits.push(tdone+'/'+tasks+' tasks done');
+  if(d.protein)bits.push(d.protein+'g protein');
+  if(ex)bits.push(ex+' exercise'+(ex>1?'s':''));
+  if(String(d.note||'').replace(/<[^>]*>|&nbsp;/g,'').trim())bits.push('note');
+  return bits.join(' · ');
+}
+function histDiff(a,b){
+  const C=window.trackerSync.canon,known=histKnown(),out=[],empty=v=>v==null||v===0||v==='';
+  new Set([...Object.keys(a||{}),...Object.keys(b||{})]).forEach(k=>{
+    if(!known.has(k))return;
+    const x=(a||{})[k],y=(b||{})[k];
+    if(empty(x)&&empty(y))return;
+    if(JSON.stringify(C(x))!==JSON.stringify(C(y)))out.push(histLabel(k));
+  });
+  return out;
+}
+function histWhen(ts){
+  const t=new Date(ts),n=new Date(),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  if(t.toDateString()===n.toDateString())return 'Today '+time;
+  const y=new Date(n.getFullYear(),n.getMonth(),n.getDate()-1);
+  if(t.toDateString()===y.toDateString())return 'Yesterday '+time;
+  return DOW[t.getDay()]+' '+t.getDate()+' '+MONTHS[t.getMonth()].slice(0,3)+', '+time;
+}
+let histEl=null;
+function histClose(){if(histEl)histEl.classList.remove('on');}
+async function openHistory(){
+  if(!histEl){histEl=document.createElement('div');histEl.id='histPanel';document.body.appendChild(histEl);
+    histEl.addEventListener('click',e=>{if(e.target===histEl)histClose();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')histClose();});}
+  const day=isoOf(year,month0,sel),title=DOW[new Date(year,month0,sel).getDay()]+' '+sel+' '+MONTHS[month0].slice(0,3);
+  const box=document.createElement('div');box.className='box';
+  box.innerHTML='<div class="hd"><span class="t"></span><button class="x" type="button" aria-label="Close">×</button></div><div class="note"></div><div class="list"></div>';
+  box.querySelector('.t').textContent='History · '+title;
+  box.querySelector('.x').onclick=histClose;
+  const note=box.querySelector('.note'),list=box.querySelector('.list');
+  histEl.innerHTML='';histEl.appendChild(box);histEl.classList.add('on');
+  if(!(window.trackerSync&&window.trackerSync.signedIn())){note.textContent='Sign in to see this day\'s history.';return;}
+  note.textContent='Loading…';
+  let res;
+  try{res=await window.trackerSync.history(day);}catch(e){note.textContent='Couldn\'t load history: '+((e&&e.message)||e)+'. Check your connection and try again.';return;}
+  const cur=(res.current&&res.current.data)||null,C=window.trackerSync.canon;
+  // Each history entry is how the day looked until a change. Keep the ones that stayed
+  // at least a minute (skips the in-between states of quick taps) and differ from now.
+  const v=res.versions,kept=[];let lastSig=JSON.stringify(C(cur));
+  v.forEach((x,i)=>{
+    const older=v[i+1],life=older?new Date(x.replaced_at)-new Date(older.replaced_at):Infinity;
+    if(life<60000)return;
+    const sig=JSON.stringify(C(x.data));
+    if(sig===lastSig)return;
+    lastSig=sig;kept.push(x);
+  });
+  note.textContent='Now: '+histSummary(cur)+'. Each entry below is how this day looked until a later change. Restoring puts it back; the current version is kept here, so you can undo.';
+  if(!kept.length){const e=document.createElement('div');e.className='hv';e.innerHTML='<div class="sum">No earlier versions of this day.</div>';list.appendChild(e);return;}
+  kept.forEach(x=>{
+    const r=document.createElement('div');r.className='hv';
+    r.innerHTML='<div class="when"></div><div class="sum"></div><div class="dif"></div><button type="button">Restore this version</button>';
+    r.querySelector('.when').textContent='Until '+histWhen(x.replaced_at);
+    r.querySelector('.sum').textContent=histSummary(x.data);
+    const dif=histDiff(x.data,cur);
+    r.querySelector('.dif').textContent=dif.length?'Different from now: '+dif.slice(0,6).join(', ')+(dif.length>6?' and '+(dif.length-6)+' more':''):'';
+    const b=r.querySelector('button');
+    b.onclick=async()=>{
+      if(!b.classList.contains('sure')){list.querySelectorAll('button.sure').forEach(o=>{o.classList.remove('sure');o.textContent='Restore this version';});
+        b.classList.add('sure');b.textContent='Tap again to restore';return;}
+      b.disabled=true;b.textContent='Restoring…';
+      try{await window.trackerSync.restoreDay(day,x.data);b.textContent='Restored ✓';setTimeout(histClose,700);}
+      catch(e){b.disabled=false;b.classList.remove('sure');b.textContent='Restore this version';note.textContent='Couldn\'t restore: '+((e&&e.message)||e);}
+    };
+    list.appendChild(r);
+  });
+}
+document.getElementById('dhHist').onclick=openHistory;
 
 // ---- Dashboard (month view) ----
 // Early morning win: the first three habits of the day, all done.
