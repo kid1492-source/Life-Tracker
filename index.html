@@ -246,6 +246,28 @@
   .tpal button.on{border-color:var(--ink);}
   .tadd{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:10px 14px;cursor:pointer;}
   .tadd:active{color:var(--ink);}
+
+  /* ---- Workout log (per day, under the Workout habit) ---- */
+  .wo{border-top:1px solid var(--line);padding:4px 0 2px;}
+  .wo-sum{padding:8px 16px 4px 50px;font-size:12px;font-weight:700;color:#D9A15C;}
+  .wo-sum:empty{display:none;}
+  .wox{padding:8px 10px 8px 34px;border-bottom:1px solid var(--line);}
+  .wox:last-of-type{border-bottom:0;}
+  .wo-l1{display:flex;align-items:center;gap:8px;}
+  .wo-b{color:#D9A15C;font-size:16px;line-height:1;width:10px;flex:none;}
+  .wo-n{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid transparent;color:var(--ink);font:inherit;font-size:14.5px;padding:3px 0;}
+  .wo-n:focus,.wo-f input:focus{outline:none;border-bottom-color:var(--pine);}
+  .wo-n::placeholder,.wo-f input::placeholder{color:var(--muted);opacity:.7;}
+  .wo-k{flex:none;background:#3A3935;border:1px solid var(--line);border-radius:999px;color:var(--ink);font:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
+  .wo-k.s{color:#F2C14E;}
+  .wo-k.c{color:#7DCB7D;}
+  .wo-del{flex:none;background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:3px 6px;}
+  .wo-f{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px;padding:4px 0 0 18px;color:var(--muted);font-size:13px;}
+  .wo-f input{width:4ch;background:#262624;border:0;border-bottom:1px solid var(--line);border-radius:4px 4px 0 0;color:var(--ink);font:inherit;font-size:14px;font-weight:600;text-align:center;padding:3px 2px;}
+  .wo-f .gap{margin:0 6px;}
+  .wo-acts{display:flex;gap:6px;padding:6px 10px 8px 46px;flex-wrap:wrap;}
+  .wo-acts button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:6px 4px;cursor:pointer;}
+  .wo-acts button.copy{color:#D9A15C;}
 </style>
 </head>
 <body>
@@ -317,6 +339,7 @@
     <div class="sec-label"><span class="dot" style="background:#D9A15C"></span><h2>Extra Points</h2></div>
     <div class="card">
       <div class="row" data-key="xWorkout"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Workout</div><div class="freq">Bonus win</div></div></div>
+      <div class="wo" id="woLog"></div>
     </div>
   </section>
 
@@ -1423,6 +1446,107 @@ window.trackerRefresh=async function(){await baseTaskRefresh();carryReady=true;c
 // Signed out (or sign-in never resolves): carry from the device copy.
 setTimeout(()=>{if(!carryReady&&!(window.trackerSync&&window.trackerSync.signedIn())){carryReady=true;carryTasks();}},4000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(carryTasks,1500);});
+
+// ---- Workout log ----
+// Stored per day as o.workout = {items:[{id,n,k,s,r,w,m,km}]}: n = exercise, k = 's' strength or
+// 'c' cardio, s × r reps at w kg, or m minutes and km. Kept inside an object so the whole log
+// syncs as one field.
+const woHost=document.getElementById('woLog');
+let woSig='';
+const woItems=o=>(o&&o.workout&&Array.isArray(o.workout.items))?o.workout.items:[];
+function woList(){const o=dayObj(sel);if(!o.workout||!Array.isArray(o.workout.items))o.workout={items:[]};return o.workout.items;}
+const woFind=id=>woList().find(x=>x.id===id);
+const woNum=v=>{const n=parseFloat(String(v||'').replace(',','.'));return isFinite(n)&&n>0?n:0;};
+const woSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel].workout)||null);
+function woSummary(list){
+  const named=list.filter(x=>String(x.n||'').trim());if(!named.length)return '';
+  let sets=0,mins=0,km=0;
+  named.forEach(x=>{if(x.k==='c'){mins+=woNum(x.m);km+=woNum(x.km);}else sets+=woNum(x.s);});
+  const bits=[named.length+(named.length===1?' exercise':' exercises')];
+  if(sets)bits.push(sets+' sets');
+  if(mins)bits.push(mins+' min cardio');
+  if(km)bits.push(Math.round(km*10)/10+' km');
+  return bits.join(' · ');
+}
+// Logging an exercise ticks the Workout habit for that day.
+function woAutoTick(){const o=dayObj(sel);if(o.xWorkout!==1&&woSummary(woItems(o))){o.xWorkout=1;save();}}
+function woField(x,key,ph,label){
+  const i=document.createElement('input');i.type='text';i.inputMode='decimal';i.maxLength=6;i.placeholder=ph;i.value=x[key]||'';
+  i.setAttribute('aria-label',label);
+  i.oninput=()=>{const y=woFind(x.id);if(!y)return;const v=i.value.trim();if(v)y[key]=v;else delete y[key];woChanged();};
+  return i;
+}
+function woChanged(){woSig=woSigNow();woHost.querySelector('.wo-sum').textContent=woSummary(woItems(days[sel]));scheduleSave();}
+function woRow(x){
+  const r=document.createElement('div');r.className='wox';r.dataset.id=x.id;
+  const l1=document.createElement('div');l1.className='wo-l1';
+  const b=document.createElement('span');b.className='wo-b';b.textContent='•';
+  const n=document.createElement('input');n.type='text';n.className='wo-n';n.maxLength=60;n.placeholder='Exercise, e.g. Bench press';n.value=x.n||'';
+  n.oninput=()=>{const y=woFind(x.id);if(!y)return;y.n=n.value;woChanged();};
+  n.onblur=()=>woAutoTick();
+  n.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const f=r.querySelector('.wo-f input');if(f)f.focus();}};
+  const k=document.createElement('button');k.type='button';k.className='wo-k '+(x.k==='c'?'c':'s');k.textContent=x.k==='c'?'Cardio':'Strength';
+  k.setAttribute('aria-label','Switch between strength and cardio');
+  k.onclick=()=>{const y=woFind(x.id);if(!y)return;y.k=y.k==='c'?'s':'c';save();renderWorkout(true);};
+  const del=document.createElement('button');del.type='button';del.className='wo-del';del.textContent='×';del.setAttribute('aria-label','Remove exercise');
+  del.onclick=()=>{const o=dayObj(sel);o.workout.items=woList().filter(y=>y.id!==x.id);save();renderWorkout(true);};
+  l1.append(b,n,k,del);
+  const f=document.createElement('div');f.className='wo-f';
+  const gap=()=>{const g=document.createElement('span');g.className='gap';g.textContent='·';return g;};
+  if(x.k==='c')f.append(woField(x,'m','30','Minutes'),' min',gap(),woField(x,'km','–','Distance in km'),' km');
+  else f.append(woField(x,'s','3','Sets'),' sets ×',woField(x,'r','10','Reps'),' reps',gap(),woField(x,'w','–','Weight in kg'),' kg');
+  r.append(l1,f);
+  return r;
+}
+// Most recent earlier day (up to 60 days back) that has a workout logged.
+async function woLastWorkout(){
+  for(let back=1;back<=60;back++){
+    const t=new Date(year,month0,sel-back);
+    const md=await readMonthDays(t.getFullYear(),t.getMonth());
+    const list=woItems(md[t.getDate()]).filter(x=>String(x.n||'').trim());
+    if(list.length)return {list,when:t};
+  }
+  return null;
+}
+function renderWorkout(force){
+  const sig=woSigNow();
+  if(!force&&sig===woSig)return;
+  if(!force&&woHost.contains(document.activeElement))return;  // don't redraw while typing
+  woSig=sig;
+  const list=woItems(days[sel]);
+  woHost.innerHTML='<div class="wo-sum"></div>';
+  woHost.querySelector('.wo-sum').textContent=woSummary(list);
+  list.forEach(x=>woHost.appendChild(woRow(x)));
+  const acts=document.createElement('div');acts.className='wo-acts';
+  const add=document.createElement('button');add.type='button';add.textContent='+ Add exercise';
+  add.onclick=()=>{const x={id:newTaskId(),n:'',k:'s'};
+    woList().push(x);scheduleSave();renderWorkout(true);const el=woHost.querySelector('[data-id="'+x.id+'"] .wo-n');if(el)el.focus();};
+  acts.appendChild(add);
+  woHost.appendChild(acts);
+  if(!list.length){
+    const sel0=storeKey()+':'+sel;
+    woLastWorkout().then(last=>{
+      if(!last||storeKey()+':'+sel!==sel0||woItems(days[sel]).length||!acts.isConnected)return;
+      const cp=document.createElement('button');cp.type='button';cp.className='copy';
+      cp.textContent='Copy last workout ('+DOW[last.when.getDay()]+' '+last.when.getDate()+' '+MONTHS[last.when.getMonth()].slice(0,3)+')';
+      cp.onclick=()=>{const o=dayObj(sel);o.workout={items:last.list.map(x=>Object.assign({},x,{id:newTaskId()}))};
+        if(o.xWorkout!==1)o.xWorkout=1;save();renderWorkout(true);};
+      acts.appendChild(cp);
+    });
+  }
+}
+// Leaving the log: drop rows with nothing typed, then redraw with the latest data.
+woHost.addEventListener('focusout',()=>setTimeout(()=>{
+  if(woHost.contains(document.activeElement))return;
+  const o=days[sel];
+  if(o&&o.workout&&Array.isArray(o.workout.items)){
+    const keep=o.workout.items.filter(x=>String(x.n||'').trim()||x.s||x.r||x.w||x.m||x.km);
+    if(keep.length!==o.workout.items.length){o.workout.items=keep;scheduleSave();}
+  }
+  renderWorkout();
+},0));
+const baseWoRender=render;
+render=function(){baseWoRender();renderWorkout();};
 
 // ---- Dashboard (month view) ----
 // Early morning win: the first three habits of the day, all done.
