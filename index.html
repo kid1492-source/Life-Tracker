@@ -344,7 +344,6 @@
     <div class="card">
       <div class="row" data-key="dJournal"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Journaling</div><div class="freq">Reflect on the day</div></div></div>
       <div class="row" data-key="nPlan"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Plan for tomorrow</div><div class="freq">Set the day ahead</div></div></div>
-      <div class="row" data-key="nSleep10"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Sleep</div><div class="freq">By 10:00 PM</div></div></div>
     </div>
   </section>
 
@@ -395,15 +394,6 @@
           <button class="step" id="pAddBtn" type="button">Add</button>
         </div>
         <div class="plog" id="pLog"></div>
-      </div>
-      <div class="meter">
-        <div class="meter-head"><span class="m-name">Sleep</span><span class="m-val" id="sleepVal">— / 7h</span></div>
-        <div class="bar"><span id="sleepBar"></span></div>
-        <div class="steppers">
-          <button class="step" data-sleep="-0.5">−½h</button>
-          <button class="step" data-sleep="0.5">+½h</button>
-          <button class="step reset" data-sleep="reset">Reset</button>
-        </div>
       </div>
       <div class="row" data-key="weights"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Weight training</div><div class="freq">2× per week</div></div></div>
       <div class="row" data-key="boxing"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Boxing</div><div class="freq">2× per week</div></div></div>
@@ -1029,10 +1019,10 @@ const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let REAL=new Date(); // today; updated when the date changes while the app stays open
 let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
-const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal','nSleep10',
+const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal',
   'dRelVid','dEduVid','dDeep','xWorkout',
   'dHajat','tahajud','taubat','weights','boxing','running','cqg','wife','ibu','parents'];
-const MAX=7+BOOL_KEYS.length; // 5 solat + protein + sleep + checkboxes
+const MAX=6+BOOL_KEYS.length; // 5 solat + protein + checkboxes
 
 function blankDay(){const o={solat:[0,0,0,0,0],solatNotes:['','','','',''],protein:0,sleep:null,note:'',mood:0};
   BOOL_KEYS.forEach(k=>o[k]=0); return o;}
@@ -1046,13 +1036,12 @@ function firstDow(){return new Date(year,month0,1).getDay();}
 function storeKey(){return 'tracker:'+year+'-'+String(month0+1).padStart(2,'0');}
 function dow(d){return DOW[new Date(year,month0,d).getDay()];}
 function dayPoints(o){if(!o)return 0;let p=o.solat.filter(s=>s===1).length;
-  if(o.protein>=120)p++; if(o.sleep!=null&&o.sleep>=7)p++;
+  if(o.protein>=120)p++;
   BOOL_KEYS.forEach(k=>{if(o[k]===1)p++;}); return p;}
 
 const TARGETS=[
   {name:'Solat',target:d=>d*5,type:'solat',hue:'amber'},
   {name:'Protein ≥120g',target:d=>d,type:'proteinDays'},
-  {name:'Sleep ≥7h',target:d=>d,type:'sleepDays'},
   {name:'Weight training',target:8,key:'weights'},
   {name:'Boxing',target:8,key:'boxing'},
   {name:'Running / elevation',target:8,key:'running'},
@@ -1066,7 +1055,6 @@ function tgtVal(t){return typeof t.target==='function'?t.target(dim()):t.target;
 function metric(t){let c=0,n=dim();for(let d=1;d<=n;d++){const o=days[d];if(!o)continue;
   if(t.type==='solat')c+=o.solat.filter(s=>s===1).length;
   else if(t.type==='proteinDays')c+=(o.protein>=120?1:0);
-  else if(t.type==='sleepDays')c+=(o.sleep!=null&&o.sleep>=7?1:0);
   else if(t.key)c+=(o[t.key]===1?1:0);} return c;}
 
 // ---- persistence ----
@@ -1268,8 +1256,6 @@ function renderProteinLog(o){
     r.append(g,f,x);host.appendChild(r);
   });
 }
-document.querySelectorAll('[data-sleep]').forEach(b=>{b.onclick=()=>{const o=dayObj(sel);const v=b.dataset.sleep;
-  if(v==='reset')o.sleep=null;else o.sleep=Math.max(0,Math.min(14,(o.sleep||0)+(+v)));save();};});
 
 // month nav
 document.getElementById('prevM').onclick=async()=>{await flush();month0--;if(month0<0){month0=11;year--;}loadMonth();};
@@ -1316,11 +1302,6 @@ function render(){
   document.getElementById('proteinVal').classList.toggle('hit',o.protein>=120);
   document.getElementById('proteinBar').style.width=Math.min(100,o.protein/120*100)+'%';
   renderProteinLog(o);
-  // sleep
-  const sv=document.getElementById('sleepVal');
-  sv.textContent=(o.sleep==null?'—':o.sleep)+' / 7h';
-  sv.classList.toggle('hit',o.sleep!=null&&o.sleep>=7);
-  document.getElementById('sleepBar').style.width=Math.min(100,(o.sleep||0)/7*100)+'%';
   // daily review
   const MOODS=['','Low','Okay','Good','Great'];
   document.querySelectorAll('#moodRow span').forEach(b=>b.classList.toggle('on',+b.dataset.m===o.mood));
@@ -1733,7 +1714,7 @@ render=function(){baseWoRender();renderWorkout();};
 // Early morning win: the first three habits of the day, all done.
 const EARLY=[['mWake','Wake up'],['tahajud','Tahajud'],['mFajr','Fajr (early)']];
 const earlyWin=o=>!!o&&EARLY.every(([k])=>o[k]===1);
-const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],['nSleep10','Sleep by 10'],
+const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],
   ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['taubat','Taubat'],
   ['weights','Weights'],['boxing','Boxing'],['running','Running'],['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
 const NS='http://www.w3.org/2000/svg';
