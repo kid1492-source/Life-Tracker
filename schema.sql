@@ -77,3 +77,31 @@ revoke all on function public.keep_day_history() from public, anon, authenticate
 drop trigger if exists tracker_days_history_keep on public.tracker_days;
 create trigger tracker_days_history_keep after update on public.tracker_days
   for each row execute function public.keep_day_history();
+
+-- Calendar events: one row per event. id is made on the device, so an event can be
+-- created offline. Deleting sets deleted=true, so other devices learn about it.
+create table if not exists public.tracker_plan_items (
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  id         text        not null check (char_length(id) between 1 and 64),
+  day        date        not null,
+  start_time text        check (start_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  end_time   text        check (end_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  title      text        not null default '' check (char_length(title) <= 200),
+  color      text        not null default 'green' check (color in ('green','yellow','red')),
+  status     smallint    not null default 0 check (status in (0,1,2)),  -- 0 not yet, 1 done, 2 cancelled
+  note       text        not null default '' check (char_length(note) <= 20000),
+  deleted    boolean     not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+create index if not exists tracker_plan_items_user_day on public.tracker_plan_items (user_id, day);
+alter table public.tracker_plan_items enable row level security;
+drop policy if exists "tracker_plan_items_select_own" on public.tracker_plan_items;
+drop policy if exists "tracker_plan_items_insert_own" on public.tracker_plan_items;
+drop policy if exists "tracker_plan_items_update_own" on public.tracker_plan_items;
+create policy "tracker_plan_items_select_own" on public.tracker_plan_items for select using ((select auth.uid()) = user_id);
+create policy "tracker_plan_items_insert_own" on public.tracker_plan_items for insert with check ((select auth.uid()) = user_id);
+create policy "tracker_plan_items_update_own" on public.tracker_plan_items for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop trigger if exists tracker_plan_items_touch on public.tracker_plan_items;
+create trigger tracker_plan_items_touch before insert or update on public.tracker_plan_items
+  for each row execute function public.touch_updated_at();

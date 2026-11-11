@@ -41,7 +41,7 @@
   .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px;}
   .tab{flex:1;background:none;border:0;color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;padding:9px;border-radius:9px;cursor:pointer;}
   .tab.on{background:var(--pine);color:#fff;}
-  .dashmode .trackOnly{display:none;}
+  .dashmode .trackOnly,.calmode .trackOnly{display:none;}
   #dash{display:none;}
   .dashmode #dash{display:block;}
   .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
@@ -314,7 +314,7 @@
     <button class="navbtn" id="nextM">Next ›</button>
   </div>
 
-  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
+  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabCal" role="tab">Calendar</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
 
   <!-- Calendar -->
   <div class="cal">
@@ -589,7 +589,28 @@ function pendingReviews(){
   });
   return out;
 }
-const pendingCount=()=>pendingDays().length+pendingReviews().length;
+// ---- calendar events: one row per event in tracker_plan_items ----
+// Same model as days: cache (what the screen edits) and baseline (what the cloud held);
+// only changed fields are sent. Deleting sets deleted=true so other devices learn about it.
+const PLAN_TABLE='tracker_plan_items';
+const ITEM_FIELDS=['day','start_time','end_time','title','color','status','note','deleted'];
+const ITEM_COLS='id,'+ITEM_FIELDS.join(',');
+const planKey=()=>ns()+'plan';
+const readPlan=()=>parse(ls.get(planKey()),null)||{};
+const writePlan=p=>ls.set(planKey(),JSON.stringify(p));
+const readPlanBase=()=>parse(ls.get('base:'+planKey()),null)||{};
+const writePlanBase=p=>ls.set('base:'+planKey(),JSON.stringify(p));
+const iv=v=>v===undefined?null:v;
+function changedItem(l,b){
+  const out={};if(!l)return out;
+  ITEM_FIELDS.forEach(f=>{if(!same(iv(l[f]),iv(b&&b[f])))out[f]=iv(l[f]);});
+  return out;
+}
+function pendingItems(){
+  const c=readPlan(),b=readPlanBase();
+  return Object.keys(c).map(id=>({id,diff:changedItem(c[id],b[id])})).filter(x=>hasKeys(x.diff));
+}
+const pendingCount=()=>pendingDays().length+pendingReviews().length+pendingItems().length;
 
 // ---- notices (shown in the bar) ----
 const getNotices=()=>parse(ls.get(NOTICE_KEY),[]);
@@ -654,6 +675,23 @@ async function pushReview({mk,diff}){
   writeCache(mk,c);
 }
 
+async function pushItem({id,diff}){
+  const {data:row,error:e1}=await sb.from(PLAN_TABLE).select(ITEM_COLS).eq('id',id).maybeSingle();
+  if(e1) throw e1;
+  const base=readPlanBase()[id]||null, server=row?pick(row,ITEM_FIELDS):null;
+  if(server&&base) Object.keys(diff).forEach(f=>{
+    if(!same(iv(server[f]),iv(base[f]))&&!same(iv(server[f]),diff[f])) addNotice(server.day||'','event changed on another device too: '+f);
+  });
+  const {data:saved,error:e2}=await sb.from(PLAN_TABLE)
+    .upsert(Object.assign({user_id:user.id,id},server||{},diff),{onConflict:'user_id,id'}).select(ITEM_COLS).single();
+  if(e2) throw e2;
+  const confirmed=pick(saved,ITEM_FIELDS);
+  const b=readPlanBase(); b[id]=confirmed; writePlanBase(b);
+  // Keep edits made while the upload was in flight.
+  const snapshot=Object.assign({},base||{},diff), c=readPlan(), since=changedItem(c[id],snapshot);
+  c[id]=Object.assign({},confirmed,since); writePlan(c);
+}
+
 async function doFlush(){
   if(!user) return;
   try{
@@ -667,6 +705,12 @@ async function doFlush(){
       const next=pendingReviews()[0];
       if(!next) break;
       await pushReview(next);
+      refresh();
+    }
+    for(let guard=0;guard<1000;guard++){
+      const next=pendingItems()[0];
+      if(!next) break;
+      await pushItem(next);
       refresh();
     }
     lastOk=Date.now(); lastError=''; retryMs=0; clearTimeout(retryTimer);
@@ -729,7 +773,36 @@ async function pull(){
     b.review=server;
     writeCache(mk,c); writeBase(mk,b);
   });
+  await pullPlan();
   return {cloud};
+}
+async function pullPlan(){
+  const rows=[];
+  for(let from=0;;from+=1000){
+    const {data,error}=await sb.from(PLAN_TABLE).select(ITEM_COLS).order('id').range(from,from+999);
+    if(error) throw error;
+    rows.push(...(data||[]));
+    if(!data||data.length<1000) break;
+  }
+  const c=readPlan(), b=readPlanBase();
+  rows.forEach(r=>{
+    const server=pick(r,ITEM_FIELDS), was=b[r.id], pend=changedItem(c[r.id],was);
+    if(was) Object.keys(pend).forEach(f=>{
+      if(!same(iv(server[f]),iv(was[f]))&&!same(iv(server[f]),pend[f])) addNotice(server.day,'event changed on another device too: '+f);
+    });
+    c[r.id]=Object.assign({},server,pend);
+    b[r.id]=server;
+  });
+  writePlan(c); writePlanBase(b);
+}
+// Events made while signed out are added to the account (ids are unique, so nothing clashes).
+function adoptAnonPlan(){
+  const k='anon:plan', anon=parse(ls.get(k),null);
+  if(!anon) return;
+  const c=readPlan();
+  Object.keys(anon).forEach(id=>{ if(!c[id]) c[id]=anon[id]; });
+  writePlan(c);
+  ls.set('backup:'+k,ls.get(k)); ls.del(k);
 }
 
 // Signed-out (or pre-sign-in) edits are merged in, never dropped:
@@ -785,6 +858,7 @@ async function onSignedIn(){
   try{
     const {cloud}=await pull();
     const a=adoptAnon(cloud);
+    adoptAnonPlan();
     if(a.conflicts.length) addNotice('account','kept the cloud value for '+a.conflicts.length+' field(s) that were set differently on this device (backup kept on this device): '+a.conflicts.slice(0,3).join(', '));
     lastError='';
   }catch(e){
@@ -901,6 +975,18 @@ window.storage={
   async list(p){
     const pre=ns();
     return {keys:ls.keys().filter(x=>x.startsWith(pre+(p||''))).map(x=>x.slice(pre.length))};
+  }
+};
+
+// ---- calendar events, used by calendar.js ----
+window.trackerPlan={
+  all:()=>readPlan(),
+  put(item){
+    const c=readPlan();
+    c[item.id]=Object.assign({},c[item.id]||{},item);
+    writePlan(c);
+    if(user) scheduleFlush(500);
+    setStatus();
   }
 };
 
@@ -1792,16 +1878,25 @@ function renderDashboard(){
     if(cnt[i]){const v=svgEl('text',{x:x+bw2/2,y:T2+ph2-h-3,'text-anchor':'middle'},svg);v.textContent=Math.round(a/MAX*100)+'%';}});
 }
 
-// ---- Track / Dashboard tabs ----
+// ---- Track / Calendar / Dashboard tabs ----
 (function(){
   const wrap=document.querySelector('.wrap'),cal=wrap.querySelector('.cal'),dash=document.getElementById('dash');
   for(let el=cal;el&&el!==dash;el=el.nextElementSibling)el.classList.add('trackOnly');
-  const tT=document.getElementById('tabTrack'),tD=document.getElementById('tabDash');
-  function setView(v){const on=v==='dash';document.body.classList.toggle('dashmode',on);tD.classList.toggle('on',on);tT.classList.toggle('on',!on);
-    document.getElementById('saveBar').style.display=on?'none':'';
-    try{localStorage.setItem('view',v);}catch(e){}if(on)renderDashboard();window.scrollTo(0,0);}
-  tT.onclick=()=>setView('track');tD.onclick=()=>setView('dash');window.trackerSetView=setView;
-  const baseR=render;render=function(){baseR();if(document.body.classList.contains('dashmode'))renderDashboard();};
+  const tabs={track:document.getElementById('tabTrack'),cal:document.getElementById('tabCal'),dash:document.getElementById('tabDash')};
+  function setView(v){
+    document.body.classList.toggle('dashmode',v==='dash');
+    document.body.classList.toggle('calmode',v==='cal');
+    Object.keys(tabs).forEach(k=>tabs[k].classList.toggle('on',k===v));
+    document.getElementById('saveBar').style.display=v==='track'?'':'none';
+    try{localStorage.setItem('view',v);}catch(e){}
+    if(v==='dash')renderDashboard();
+    if(v==='cal'&&window.renderCalendar)window.renderCalendar();
+    window.scrollTo(0,0);}
+  Object.keys(tabs).forEach(k=>{tabs[k].onclick=()=>setView(k);});
+  window.trackerSetView=setView;
+  const baseR=render;render=function(){baseR();
+    if(document.body.classList.contains('dashmode'))renderDashboard();
+    if(document.body.classList.contains('calmode')&&window.renderCalendar)window.renderCalendar();};
 })();
 
 // New day while the app stayed open (phones keep it in the background): move "today" on.
@@ -1822,5 +1917,6 @@ setInterval(checkDate,60000);
 // Load this month at startup so today is selected (not day 1), before sign-in finishes.
 loadMonth();
 </script>
+<script src="calendar.js"></script>
 </body>
 </html>
