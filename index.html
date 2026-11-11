@@ -323,7 +323,7 @@
     <button class="navbtn" id="nextM">Next ›</button>
   </div>
 
-  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabCal" role="tab">Calendar</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
+  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabCal" role="tab">Plan</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
 
   <!-- Calendar -->
   <div class="cal">
@@ -1901,7 +1901,7 @@ function renderDashboard(){
     if(cnt[i]){const v=svgEl('text',{x:x+bw2/2,y:T2+ph2-h-3,'text-anchor':'middle'},svg);v.textContent=Math.round(a/MAX*100)+'%';}});
 }
 
-// ---- Track / Calendar / Dashboard tabs ----
+// ---- Track / Plan / Dashboard tabs ----
 (function(){
   const wrap=document.querySelector('.wrap'),cal=wrap.querySelector('.cal'),dash=document.getElementById('dash');
   for(let el=cal;el&&el!==dash;el=el.nextElementSibling)el.classList.add('trackOnly');

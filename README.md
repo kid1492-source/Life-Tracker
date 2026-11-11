@@ -39,11 +39,11 @@ The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or 
 
 ## Plan for tomorrow
 
-The **Plan for tomorrow** habit has a button that opens tomorrow in the Calendar with a "Planning tomorrow" banner. **Done planning** ticks the habit on the original day and returns to Track.
+The **Plan for tomorrow** habit has a button that opens tomorrow in the Plan tab with a "Planning tomorrow" banner. **Done planning** ticks the habit on the original day and returns to Track.
 
-## Calendar
+## Plan
 
-The **Calendar** tab (`calendar.js`) is for planning:
+The **Plan** tab (`calendar.js`) is for planning. It opens on today's day view; **‹ Month** (or tapping the tab again) shows the month:
 
 - **Month view:** event names in each day, in the colour chosen for the event (green, yellow or red). Cancelled events are faded and struck through.
 - **Day view:** a timeline of the day's events. Only hours with events are shown; free gaps over 30 minutes are labelled, and a red line marks the current time. An event that starts inside another is indented. Each event is tapped through ✓ done, ✕ cancelled, blank not yet.
@@ -52,7 +52,7 @@ The **Calendar** tab (`calendar.js`) is for planning:
 
 ## Tasks
 
-The **Task** section is in the Calendar day view, under the timeline. Each day has three lists: **MITs · Deep work**, **Quick wins** and **Pocket Task**. Tasks are stored in the day's row as `tasks`. When today is opened, unfinished tasks from earlier days are copied to the top of today once (marked ↪). A task deleted or ticked today is not brought back.
+The **Task** section is in the Plan tab's day view, under the timeline. Each day has three lists: **MITs · Deep work**, **Quick wins** and **Pocket Task**. Tasks are stored in the day's row as `tasks`. When today is opened, unfinished tasks from earlier days are copied to the top of today once (marked ↪). A task deleted or ticked today is not brought back.
 
 ## Publish to GitHub Pages
 

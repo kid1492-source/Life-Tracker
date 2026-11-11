@@ -1,4 +1,4 @@
-// Calendar tab: month view with events, and a day view with a timeline of events
+// Plan tab: opens on today's day view (timeline of events, note, tasks); "‹ Month" shows the month
 // followed by the day's tasks (the Task section, moved here from Track).
 // Events are stored by the sync layer (window.trackerPlan) in tracker_plan_items.
 // Uses the app's globals: year, month0, sel, days, REAL, MONTHS, DOW, dim(), firstDow(),
@@ -189,7 +189,7 @@ function check(st,onTap,label){const b=document.createElement('button');b.type='
   b.onclick=e=>{e.stopPropagation();onTap();};return b;}
 function cycle(ev){P().put({id:ev.id,status:((ev.status||0)+1)%3});render();}
 
-let mode='month';
+let mode='day';
 
 // ---------- month view ----------
 function renderMonth(list){
@@ -315,7 +315,7 @@ const planBtn=document.createElement('button');planBtn.type='button';planBtn.cla
 planBtn.onclick=e=>{e.stopPropagation();planTomorrow();};
 if(planRow)planRow.appendChild(planBtn);
 function drawPlanBtn(){const t=new Date(year,month0,sel+1);planBtn.textContent='Plan '+DOW[t.getDay()]+' ›';
-  planBtn.setAttribute('aria-label','Plan tomorrow, '+DOW[t.getDay()]+' '+t.getDate()+', in the Calendar');}
+  planBtn.setAttribute('aria-label','Plan tomorrow, '+DOW[t.getDay()]+' '+t.getDate()+', in Plan');}
 const baseRenderC=render;
 render=function(){baseRenderC();drawPlanBtn();};
 
@@ -340,8 +340,14 @@ async function goDay(delta){
 $('cdPrev').onclick=()=>goDay(-1);
 $('cdNext').onclick=()=>goDay(1);
 $('cdLeft').onclick=()=>{if(taskSec)window.scrollTo({top:taskSec.getBoundingClientRect().top+window.scrollY-14,behavior:'smooth'});};
-// Tapping the Calendar tab again goes back to the month.
-$('tabCal').addEventListener('click',()=>{if(document.body.classList.contains('calmode')&&mode==='day'){mode='month';}},true);
+// Opening the Plan tab shows today. Tapping it again while on a day shows the month.
+$('tabCal').addEventListener('click',()=>{
+  if(document.body.classList.contains('calmode')){if(mode==='day')mode='month';return;}
+  mode='day';
+  const y=REAL.getFullYear(),m0=REAL.getMonth(),d=REAL.getDate();
+  if(y===year&&m0===month0){sel=d;return;}            // same month: the tab's own handler renders
+  showDay(y,m0,d).then(()=>render());                  // other month: load it first
+},true);
 
 // ---------- add / edit sheet ----------
 let editing=null,color='green',noteVal='';
