@@ -516,7 +516,12 @@ const parse=(s,fallback)=>{try{return s==null?fallback:JSON.parse(s);}catch(e){r
 
 // ---- shape helpers (blankDay comes from the app) ----
 const blank=()=>(window.trackerBlankDay?window.trackerBlankDay():{});
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// Compare values the way the cloud stores them: the database reorders object keys and keeps
+// a missing field as null, so key order and undefined-vs-null must not count as a change.
+// (Otherwise a day looks changed forever and uploads in a loop.)
+const canon=v=>v===undefined?null:Array.isArray(v)?v.map(canon):(v&&typeof v==='object')?
+  Object.keys(v).sort().reduce((o,k)=>{if(v[k]!==undefined)o[k]=canon(v[k]);return o;},{}):v;
+const same=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
 const norm=d=>Object.assign(blank(),d||{});
 const emptyReview=()=>({weekly:{},monthly:''});
 const pad=d=>String(d).padStart(2,'0');
@@ -692,9 +697,15 @@ async function pushItem({id,diff}){
 async function doFlush(){
   if(!user) return;
   try{
+    // A day still showing the same change right after uploading it is skipped for this round,
+    // so one stuck day can't loop forever or hold up the other days.
+    const pushed={},stuck=new Set();
     for(let guard=0;guard<1000;guard++){
-      const next=pendingDays()[0];
+      const next=pendingDays().find(p=>!stuck.has(p.mk+'-'+p.d));
       if(!next) break;
+      const key=next.mk+'-'+next.d,sig=JSON.stringify(canon(next.diff));
+      if(pushed[key]===sig){stuck.add(key);continue;}
+      pushed[key]=sig;
       await pushDay(next);
       refresh(); // the device copy now holds the cloud's version: show it, so the next edit starts from it
     }
