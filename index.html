@@ -274,6 +274,22 @@
   .wo-acts{display:flex;gap:6px;padding:6px 10px 8px 46px;flex-wrap:wrap;}
   .wo-acts button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:6px 4px;cursor:pointer;}
   .wo-acts button.copy{color:#D9A15C;}
+
+  /* ---- Protein: typed amounts and the day's list ---- */
+  .padd{display:flex;gap:6px;align-items:center;margin-top:10px;}
+  .padd input{background:#262624;border:1px solid var(--line);border-radius:9px;color:var(--ink);font:inherit;font-size:13.5px;padding:7px 10px;min-width:0;}
+  .padd input:focus{outline:none;border-color:var(--pine);}
+  .padd input::placeholder{color:var(--muted);}
+  #pAmt{width:9ch;flex:none;text-align:center;font-weight:600;}
+  #pFood{flex:1;}
+  #pAmt.bad{border-color:#F07070;}
+  .plog{margin-top:8px;}
+  .plog:empty{display:none;}
+  .prow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13.5px;}
+  .prow .g{color:#D9A15C;font-weight:700;min-width:5ch;}
+  .prow .f{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .prow .f.q{color:var(--muted);}
+  .prow button{background:none;border:0;color:var(--muted);font-size:16px;line-height:1;padding:2px 6px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -373,6 +389,12 @@
           <button class="step" data-protein="40">+40g</button>
           <button class="step reset" data-protein="reset">Reset</button>
         </div>
+        <div class="padd">
+          <input id="pAmt" type="text" inputmode="decimal" maxlength="5" placeholder="grams" aria-label="Protein in grams">
+          <input id="pFood" type="text" maxlength="40" placeholder="Food (optional)" aria-label="Food">
+          <button class="step" id="pAddBtn" type="button">Add</button>
+        </div>
+        <div class="plog" id="pLog"></div>
       </div>
       <div class="meter">
         <div class="meter-head"><span class="m-name">Sleep</span><span class="m-val" id="sleepVal">— / 7h</span></div>
@@ -1128,8 +1150,38 @@ PRAYERS.forEach((p,i)=>{const el=document.createElement('div');el.className='pra
   pc.appendChild(el);});
 
 document.querySelectorAll('.row').forEach(r=>{r.onclick=()=>{const o=dayObj(sel);o[r.dataset.key]=(o[r.dataset.key]+1)%3;save();};});
+// Protein: every amount added (quick button or typed) is listed for the day in o.pLog.items
+// [{id,g,f}] (f = food). o.protein stays the running total; removing an entry takes it off.
+function pItems(o){if(!o.pLog||!Array.isArray(o.pLog.items))o.pLog={items:[]};return o.pLog.items;}
+function addProtein(g,f){
+  g=Math.round(parseFloat(String(g).replace(',','.'))*10)/10;
+  if(!isFinite(g)||g<=0||g>300)return false;
+  const o=dayObj(sel);
+  pItems(o).push(Object.assign({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),g},f?{f}:{}));
+  o.protein=Math.round(Math.min(500,(o.protein||0)+g)*10)/10;save();return true;
+}
 document.querySelectorAll('[data-protein]').forEach(b=>{b.onclick=()=>{const o=dayObj(sel);const v=b.dataset.protein;
-  if(v==='reset')o.protein=0;else o.protein=Math.min(300,o.protein+(+v));save();};});
+  if(v==='reset'){o.protein=0;o.pLog={items:[]};save();}else addProtein(+v,'');};});
+const pAmt=document.getElementById('pAmt'),pFood=document.getElementById('pFood');
+function pAddTyped(){
+  if(!addProtein(pAmt.value,pFood.value.trim())){pAmt.classList.add('bad');setTimeout(()=>pAmt.classList.remove('bad'),1500);pAmt.focus();return;}
+  pAmt.value='';pFood.value='';pAmt.blur();pFood.blur();
+}
+document.getElementById('pAddBtn').onclick=pAddTyped;
+[pAmt,pFood].forEach(i=>i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();pAddTyped();}});
+function renderProteinLog(o){
+  const host=document.getElementById('pLog');host.innerHTML='';
+  const list=(o.pLog&&Array.isArray(o.pLog.items))?o.pLog.items:[];
+  list.forEach(it=>{
+    const r=document.createElement('div');r.className='prow';
+    const g=document.createElement('span');g.className='g';g.textContent=it.g+'g';
+    const f=document.createElement('span');f.className='f'+(it.f?'':' q');f.textContent=it.f||'Quick add';
+    const x=document.createElement('button');x.type='button';x.textContent='×';x.setAttribute('aria-label','Remove '+it.g+'g');
+    x.onclick=()=>{const d=dayObj(sel);d.pLog.items=pItems(d).filter(y=>y.id!==it.id);
+      d.protein=Math.max(0,Math.round(((d.protein||0)-it.g)*10)/10);save();};
+    r.append(g,f,x);host.appendChild(r);
+  });
+}
 document.querySelectorAll('[data-sleep]').forEach(b=>{b.onclick=()=>{const o=dayObj(sel);const v=b.dataset.sleep;
   if(v==='reset')o.sleep=null;else o.sleep=Math.max(0,Math.min(14,(o.sleep||0)+(+v)));save();};});
 
@@ -1177,6 +1229,7 @@ function render(){
   document.getElementById('proteinVal').textContent=o.protein+' / 120g';
   document.getElementById('proteinVal').classList.toggle('hit',o.protein>=120);
   document.getElementById('proteinBar').style.width=Math.min(100,o.protein/120*100)+'%';
+  renderProteinLog(o);
   // sleep
   const sv=document.getElementById('sleepVal');
   sv.textContent=(o.sleep==null?'—':o.sleep)+' / 7h';
