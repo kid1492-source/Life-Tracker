@@ -8,6 +8,7 @@ Personal daily habit tracker: Solat, Taubat, Quran, routines, health metrics, fa
   - `tracker_days`: one row per user per day (the day's fields as JSON)
   - `tracker_reviews`: one row per user per month (weekly and monthly review notes)
   - `tracker_days_history`: previous version of a day each time it is overwritten
+  - `tracker_plan_items`: one row per calendar event
   - Row-level security: each signed-in account reads and writes only its own rows
 - **Auth:** email and password, or a sign-in link by email.
 - **Frontend:** single static file (`index.html`), no build step. Served by GitHub Pages.
@@ -23,9 +24,18 @@ Personal daily habit tracker: Solat, Taubat, Quran, routines, health metrics, fa
 
 The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or Not synced.
 
+## Calendar
+
+The **Calendar** tab (`calendar.js`) is for planning:
+
+- **Month view:** event names in each day, in the colour chosen for the event (green, yellow or red). Cancelled events are faded and struck through.
+- **Day view:** a timeline of the day's events. Only hours with events are shown; free gaps over 30 minutes are labelled, and a red line marks the current time. An event that starts inside another is indented. Each event is tapped through ✓ done, ✕ cancelled, blank not yet.
+- **Tasks** sit under the timeline in the day view (the header shows how many are left).
+- Events are stored one row per event in `tracker_plan_items` and sync like days: saved on the device first, only changed fields uploaded. Deleting an event marks it `deleted` so other devices drop it too.
+
 ## Tasks
 
-The Track tab has a **Task** section (above Daily Review) with two lists per day: **MITs · Deep work** and **Quick wins**. Tasks are stored in the day's row as `tasks`. When today is opened, unfinished tasks from earlier days are copied to the top of today once (marked ↪). A task deleted or ticked today is not brought back.
+The **Task** section is in the Calendar day view, under the timeline. Each day has three lists: **MITs · Deep work**, **Quick wins** and **Pocket Task**. Tasks are stored in the day's row as `tasks`. When today is opened, unfinished tasks from earlier days are copied to the top of today once (marked ↪). A task deleted or ticked today is not brought back.
 
 ## Publish to GitHub Pages
 
