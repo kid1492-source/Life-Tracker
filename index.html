@@ -261,8 +261,14 @@
   .wo-k{flex:none;background:#3A3935;border:1px solid var(--line);border-radius:999px;color:var(--ink);font:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
   .wo-k.s{color:#F2C14E;}
   .wo-k.c{color:#7DCB7D;}
+  .wo-k.i{color:#E8875F;}
+  .wo-tot{color:var(--muted);font-size:12.5px;margin-left:6px;}
+  .wo-nb{background:none;border:0;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;padding:2px 4px;margin-left:auto;cursor:pointer;opacity:.8;}
+  .wo-note{display:block;width:calc(100% - 18px);margin:6px 0 0 18px;background:none;border:0;border-bottom:1px solid transparent;color:var(--ink);font:inherit;font-size:13px;font-style:italic;padding:3px 0;opacity:.85;}
+  .wo-note:focus{outline:none;border-bottom-color:var(--pine);opacity:1;}
+  .wo-note::placeholder{color:var(--muted);opacity:.7;}
   .wo-del{flex:none;background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:3px 6px;}
-  .wo-f{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px;padding:4px 0 0 18px;color:var(--muted);font-size:13px;}
+  .wo-f{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px;width:100%;box-sizing:border-box;padding:4px 0 0 18px;color:var(--muted);font-size:13px;}
   .wo-f input{width:4ch;background:#262624;border:0;border-bottom:1px solid var(--line);border-radius:4px 4px 0 0;color:var(--ink);font:inherit;font-size:14px;font-weight:600;text-align:center;padding:3px 2px;}
   .wo-f .gap{margin:0 6px;}
   .wo-acts{display:flex;gap:6px;padding:6px 10px 8px 46px;flex-wrap:wrap;}
@@ -1448,8 +1454,9 @@ setTimeout(()=>{if(!carryReady&&!(window.trackerSync&&window.trackerSync.signedI
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(carryTasks,1500);});
 
 // ---- Workout log ----
-// Stored per day as o.workout = {items:[{id,n,k,s,r,w,m,km}]}: n = exercise, k = 's' strength or
-// 'c' cardio, s × r reps at w kg, or m minutes and km. Kept inside an object so the whole log
+// Stored per day as o.workout = {items:[{id,n,k,s,r,w,m,km,a,b,note}]}: n = exercise, k = 's'
+// strength (s sets × r reps at w kg), 'c' cardio (m minutes, km) or 'i' intervals (s rounds of
+// a work / b rest, as typed: 30, 30s, 1m, 1:30). note = free-text details. Kept inside an object so the whole log
 // syncs as one field.
 const woHost=document.getElementById('woLog');
 let woSig='';
@@ -1458,10 +1465,22 @@ function woList(){const o=dayObj(sel);if(!o.workout||!Array.isArray(o.workout.it
 const woFind=id=>woList().find(x=>x.id===id);
 const woNum=v=>{const n=parseFloat(String(v||'').replace(',','.'));return isFinite(n)&&n>0?n:0;};
 const woSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel].workout)||null);
+function woSecs(v){
+  v=String(v||'').trim().toLowerCase().replace(/\s+/g,'');if(!v)return 0;let m;
+  if((m=v.match(/^(\d+):(\d{1,2})$/)))return +m[1]*60+ +m[2];
+  if((m=v.match(/^(\d+(?:\.\d+)?)m(?:in)?(?:(\d+)s?)?$/)))return Math.round(+m[1]*60)+(+m[2]||0);
+  if((m=v.match(/^(\d+)(?:s|sec|secs)?$/)))return +m[1];
+  return 0;
+}
+const woFmtSecs=n=>n<60?n+'s':Math.floor(n/60)+'m'+(n%60?' '+(n%60)+'s':'');
+const woIntMins=x=>woNum(x.s)*(woSecs(x.a)+woSecs(x.b))/60;   // intervals: total time
+const woFmtMins=m=>m>=1?(Math.round(m*10)/10)+' min':Math.round(m*60)+'s';
+let woNoteOpen='';  // exercise whose note line was just opened
 function woSummary(list){
   const named=list.filter(x=>String(x.n||'').trim());if(!named.length)return '';
   let sets=0,mins=0,km=0;
-  named.forEach(x=>{if(x.k==='c'){mins+=woNum(x.m);km+=woNum(x.km);}else sets+=woNum(x.s);});
+  named.forEach(x=>{if(x.k==='c'){mins+=woNum(x.m);km+=woNum(x.km);}else if(x.k==='i')mins+=woIntMins(x);else sets+=woNum(x.s);});
+  mins=Math.round(mins*10)/10;
   const bits=[named.length+(named.length===1?' exercise':' exercises')];
   if(sets)bits.push(sets+' sets');
   if(mins)bits.push(mins+' min cardio');
@@ -1485,17 +1504,40 @@ function woRow(x){
   n.oninput=()=>{const y=woFind(x.id);if(!y)return;y.n=n.value;woChanged();};
   n.onblur=()=>woAutoTick();
   n.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const f=r.querySelector('.wo-f input');if(f)f.focus();}};
-  const k=document.createElement('button');k.type='button';k.className='wo-k '+(x.k==='c'?'c':'s');k.textContent=x.k==='c'?'Cardio':'Strength';
-  k.setAttribute('aria-label','Switch between strength and cardio');
-  k.onclick=()=>{const y=woFind(x.id);if(!y)return;y.k=y.k==='c'?'s':'c';save();renderWorkout(true);};
+  const kind=x.k==='c'||x.k==='i'?x.k:'s';
+  const k=document.createElement('button');k.type='button';k.className='wo-k '+kind;
+  k.textContent={s:'Strength',c:'Cardio',i:'Intervals'}[kind];
+  k.setAttribute('aria-label','Change type: strength, cardio or intervals');
+  k.onclick=()=>{const y=woFind(x.id);if(!y)return;y.k={s:'c',c:'i',i:'s'}[kind];save();renderWorkout(true);};
   const del=document.createElement('button');del.type='button';del.className='wo-del';del.textContent='×';del.setAttribute('aria-label','Remove exercise');
   del.onclick=()=>{const o=dayObj(sel);o.workout.items=woList().filter(y=>y.id!==x.id);save();renderWorkout(true);};
   l1.append(b,n,k,del);
   const f=document.createElement('div');f.className='wo-f';
   const gap=()=>{const g=document.createElement('span');g.className='gap';g.textContent='·';return g;};
-  if(x.k==='c')f.append(woField(x,'m','30','Minutes'),' min',gap(),woField(x,'km','–','Distance in km'),' km');
+  if(kind==='c')f.append(woField(x,'m','30','Minutes'),' min',gap(),woField(x,'km','–','Distance in km'),' km');
+  else if(kind==='i'){
+    const wk=woField(x,'a','30s','Work time'),rs=woField(x,'b','30s','Rest time'),tot=document.createElement('span');tot.className='wo-tot';
+    const showTot=()=>{const y=woFind(x.id)||x,m=woIntMins(y);tot.textContent=m?'= '+woFmtMins(m):'';};
+    [wk,rs].forEach(i=>{i.inputMode='text';i.style.width='5ch';
+      i.addEventListener('input',showTot);
+      i.addEventListener('blur',()=>{const v=woSecs(i.value);if(v&&woFmtSecs(v)!==i.value){i.value=woFmtSecs(v);i.oninput();}});});
+    const rd=woField(x,'s','10','Rounds');rd.addEventListener('input',showTot);
+    f.append(rd,' rounds ×',wk,' work /',rs,' rest',tot);showTot();
+  }
   else f.append(woField(x,'s','3','Sets'),' sets ×',woField(x,'r','10','Reps'),' reps',gap(),woField(x,'w','–','Weight in kg'),' kg');
   r.append(l1,f);
+  // Optional one-line note for details (effort, settings, how it felt).
+  if(x.note||woNoteOpen===x.id){
+    const nt=document.createElement('input');nt.type='text';nt.className='wo-note';nt.maxLength=160;nt.value=x.note||'';
+    nt.placeholder='Details, e.g. all out, ~45 cal per round';nt.setAttribute('aria-label','Exercise note');
+    nt.oninput=()=>{const y=woFind(x.id);if(!y)return;const v=nt.value.trim();if(v)y.note=nt.value;else delete y.note;woChanged();};
+    nt.onblur=()=>{if(woNoteOpen===x.id)woNoteOpen='';};
+    r.appendChild(nt);
+  }else{
+    const nb=document.createElement('button');nb.type='button';nb.className='wo-nb';nb.textContent='+ note';
+    nb.onclick=()=>{woNoteOpen=x.id;renderWorkout(true);const el=woHost.querySelector('[data-id="'+x.id+'"] .wo-note');if(el)el.focus();};
+    f.appendChild(nb);
+  }
   return r;
 }
 // Most recent earlier day (up to 60 days back) that has a workout logged.
@@ -1540,7 +1582,7 @@ woHost.addEventListener('focusout',()=>setTimeout(()=>{
   if(woHost.contains(document.activeElement))return;
   const o=days[sel];
   if(o&&o.workout&&Array.isArray(o.workout.items)){
-    const keep=o.workout.items.filter(x=>String(x.n||'').trim()||x.s||x.r||x.w||x.m||x.km);
+    const keep=o.workout.items.filter(x=>String(x.n||'').trim()||x.s||x.r||x.w||x.m||x.km||x.a||x.b||x.note);
     if(keep.length!==o.workout.items.length){o.workout.items=keep;scheduleSave();}
   }
   renderWorkout();
