@@ -522,6 +522,9 @@ const blank=()=>(window.trackerBlankDay?window.trackerBlankDay():{});
 const canon=v=>v===undefined?null:Array.isArray(v)?v.map(canon):(v&&typeof v==='object')?
   Object.keys(v).sort().reduce((o,k)=>{if(v[k]!==undefined)o[k]=canon(v[k]);return o;},{}):v;
 const same=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
+// Empty value: nothing recorded (0, '', null, or a list/object holding only empty values).
+const blankish=v=>v==null||v===0||v===''||v===false||
+  (Array.isArray(v)?v.every(blankish):(typeof v==='object'&&Object.keys(v).every(k=>blankish(v[k]))));
 const norm=d=>Object.assign(blank(),d||{});
 const emptyReview=()=>({weekly:{},monthly:''});
 const pad=d=>String(d).padStart(2,'0');
@@ -628,6 +631,17 @@ async function pushDay({mk,d,diff}){
   const {data:row,error:e1}=await sb.from('tracker_days').select('data').eq('day',day).maybeSingle();
   if(e1) throw e1;
   const server=norm(row&&row.data);
+  // Safety: a device whose copy of a day went blank (stale or half-loaded) must not erase what
+  // is saved. If one upload would clear 3 or more fields that hold data in the cloud, keep the
+  // cloud values for those fields on this device too, and say so.
+  const wiped=Object.keys(diff).filter(f=>!blankish(server[f])&&blankish(diff[f]));
+  if(wiped.length>=3){
+    const c0=readCache(mk),cd=norm(c0.days[d]);
+    wiped.forEach(f=>{cd[f]=server[f];delete diff[f];});
+    c0.days[d]=cd;writeCache(mk,c0);
+    addNotice(day,'kept the saved data for '+wiped.length+' items: this device had them blank');
+    if(!hasKeys(diff)){const b=readBase(mk);b.days[d]=norm(row&&row.data);writeBase(mk,b);return;}
+  }
   const baseDay=norm(readBase(mk).days[d]);
   const sent=Object.assign({},server);
   Object.keys(diff).forEach(f=>{sent[f]=mergeField(server[f],baseDay[f],diff[f]);});
