@@ -111,6 +111,13 @@ function streak(key){
   let d=todayIso();if(val(key,d)!==1)d=addDays(d,-1);
   let n=0;while(val(key,d)===1&&n<400){n++;d=addDays(d,-1);}return n;
 }
+// Where a new goal starts: at the beginning of the current streak (ending today, or yesterday
+// while today is still open), counting at most days-1 so the goal is never reached at once.
+function streakStart(key,days){
+  const today=todayIso(),end=val(key,today)===1?today:addDays(today,-1);
+  let n=0;while(n<days-1&&val(key,addDays(end,-n))===1)n++;
+  return n?{start:addDays(end,-(n-1)),n,end}:{start:today,n:0,end:null};
+}
 function best(key){
   let b=0,run=0;Object.keys(recent).sort().forEach(d=>{if(val(key,d)===1){run++;b=Math.max(b,run);}else run=0;});return b;
 }
@@ -243,7 +250,12 @@ function newGoal(){
   const lab=t=>{const p=document.createElement('p');p.className='clbl';p.textContent=t;return p;};
   const selEl=document.createElement('select');selEl.className='csel';selEl.setAttribute('aria-label','Habit');
   DAILY_KEYS.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=label(k);if(k===key)o.selected=true;selEl.appendChild(o);});
-  selEl.onchange=()=>{key=selEl.value;};
+  const sHint=document.createElement('p');sHint.className='fhint';
+  const setS=()=>{const st=streakStart(key,n);
+    if(!st.n){sHint.textContent='Starts counting today.';return;}
+    const a=fromIso(st.start),z=fromIso(st.end);
+    sHint.textContent='Counts your current streak: '+st.n+' day'+(st.n>1?'s':'')+' ('+DOW[a.getDay()]+' '+a.getDate()+(st.n>1?' – '+DOW[z.getDay()]+' '+z.getDate():'')+').';};
+  selEl.onchange=()=>{key=selEl.value;setS();};
   const chips=(opts,cur,on)=>{const w=document.createElement('div');w.className='chips';
     opts.forEach(([v,t])=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.classList.toggle('on',v===cur);
       b.onclick=()=>{w.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');on(v);};w.appendChild(b);});return w;};
@@ -252,14 +264,14 @@ function newGoal(){
   const compBox=document.createElement('div');compBox.append(lab('Compensation'),comp);
   const hint=document.createElement('p');hint.className='fhint';
   const setHint=()=>{hint.textContent=mode==='comp'?'One missed day is allowed: the goal grows by 1 day and you do the compensation by the next night. Another miss starts again from 0.':'Any missed day starts again from 0.';compBox.style.display=mode==='comp'?'':'none';};
-  body.append(lab('Habit'),selEl,lab('Days in a row'),chips([[3,'3 days'],[7,'7 days'],[14,'14 days'],[30,'30 days']],n,v=>{n=v;}),
+  body.append(lab('Habit'),selEl,sHint,lab('Days in a row'),chips([[3,'3 days'],[7,'7 days'],[14,'14 days'],[30,'30 days']],n,v=>{n=v;setS();}),
     lab('Reward'),reward,lab('If I miss a day'),chips([['comp','1 miss allowed, with compensation'],['strict','Start again from 0']],mode,v=>{mode=v;setHint();}),compBox,hint);
-  setHint();
+  setHint();setS();
   openSheet('New goal',body,async()=>{
     if(!reward.value.trim())return 'Add a reward to work towards.';
     if(mode==='comp'&&!comp.value.trim())return 'Add the compensation for a missed day.';
     const g={id:newId(),key,days:n,reward:reward.value.trim(),mode,comp:mode==='comp'?comp.value.trim():'',
-      start:todayIso(),compDone:[],claimed:false};   // today counts if it is already ticked
+      start:streakStart(key,n).start,compDone:[],claimed:false};
     await setSetting('goal:'+g.id,JSON.stringify(g));
   });
   setTimeout(()=>reward.focus(),50);

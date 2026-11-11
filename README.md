@@ -34,7 +34,7 @@ The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or 
 ## Focus and goals (`focus.js`)
 
 - **Today's focus** at the top of Track: up to 3 daily habits with their current streak (or best streak). Ticking there is the same tick as in the habit's own section.
-- **Goals:** a habit for N days in a row with a reward. A goal can allow one missed day: the goal grows by a day and a compensation must be marked done by the next night; otherwise, or on a second miss, it starts again. Progress is worked out from the daily ticks.
+- **Goals:** a habit for N days in a row with a reward. A goal can allow one missed day: the goal grows by a day and a compensation must be marked done by the next night; otherwise, or on a second miss, it starts again. Progress is worked out from the daily ticks. A new goal starts at the beginning of the habit's current streak (counting at most one day less than the goal, so it is never reached at once).
 - The focus list and goals are stored in `tracker_reviews` under month key `0000-00` (one entry per setting in `data.weekly`), so they sync like review notes.
 
 ## Plan for tomorrow
