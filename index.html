@@ -534,7 +534,47 @@ const hasKeys=o=>Object.keys(o).length>0;
 
 // Merge one field. Arrays (solat, solatNotes) are merged element by element: an element
 // the device did not change keeps the cloud value, so a stale copy cannot erase another prayer.
+// Lists of items with ids (tasks, workout exercises, protein entries) are merged item by item,
+// so a device holding an older copy can't drop tasks or ticks added on another device:
+// an item this device didn't touch takes the cloud version; new items from both sides stay;
+// an item deleted on one side goes unless the other side edited it.
+const isIdList=v=>Array.isArray(v)&&v.length>0&&v.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&'id' in x);
+function mergeIdList(S,B,L){
+  S=S||[];B=B||[];L=L||[];
+  const bm=new Map(B.map(x=>[x.id,x])),sm=new Map(S.map(x=>[x.id,x])),lm=new Map(L.map(x=>[x.id,x]));
+  const out=[];
+  L.forEach(x=>{
+    const b=bm.get(x.id),sv=sm.get(x.id);
+    if(sv) out.push(b&&same(x,b)?sv:x);           // in both: keep whichever side changed it
+    else if(!b||!same(x,b)) out.push(x);           // new here, or edited here after the other side deleted it
+  });
+  S.forEach((x,i)=>{
+    if(lm.has(x.id))return;
+    const b=bm.get(x.id);
+    if(b&&same(x,b))return;                        // deleted here, untouched in the cloud
+    // new (or edited) in the cloud: put it after the item it follows there
+    let at=-1;
+    for(let j=i-1;j>=0&&at<0;j--){const k=out.findIndex(y=>y.id===S[j].id);if(k>=0)at=k+1;}
+    for(let j=i+1;j<S.length&&at<0;j++){const k=out.findIndex(y=>y.id===S[j].id);if(k>=0)at=k;}
+    if(at<0)at=out.length;
+    out.splice(at,0,x);
+  });
+  return out;
+}
+function mergeObj(server,base,local){
+  if(same(local,base))return server;               // nothing changed here: take the cloud as is
+  const out={},keys=new Set([...Object.keys(server||{}),...Object.keys(local||{})]);
+  keys.forEach(k=>{
+    const sv=(server||{})[k],bv=(base||{})[k],lv=(local||{})[k];
+    if(isIdList(sv)||isIdList(lv)||isIdList(bv))out[k]=mergeIdList(Array.isArray(sv)?sv:[],Array.isArray(bv)?bv:[],Array.isArray(lv)?lv:[]);
+    else out[k]=same(lv,bv)?sv:lv;
+    if(out[k]===undefined)delete out[k];
+  });
+  return out;
+}
 function mergeField(server,base,local){
+  if(local&&server&&typeof local==='object'&&typeof server==='object'&&!Array.isArray(local)&&!Array.isArray(server))
+    return mergeObj(server,base&&typeof base==='object'?base:{},local);
   if(Array.isArray(local)&&Array.isArray(server)){
     const b=Array.isArray(base)?base:[];
     return local.map((v,i)=>same(v,b[i])?(server[i]===undefined?v:server[i]):v);
