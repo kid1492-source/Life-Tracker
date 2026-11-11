@@ -92,6 +92,14 @@ css.textContent=`
 .cacts .csave{flex:2;background:var(--pine);border-color:var(--pine);color:#fff;}
 .cacts .cdel{color:#F07070;}
 #calview #taskSec{margin-top:4px;}
+#calNoteSec{margin-bottom:18px;}
+#calNoteSec .rt{margin-top:0;}
+#calNoteSec .rt-ed{min-height:80px;background:var(--card);}
+.cnote-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:6px 2px 0;}
+.cc .npen{font-size:9px;color:var(--muted);text-align:center;line-height:1;margin-top:auto;}
+.cnoteprev{padding:10px 14px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--ink);cursor:pointer;max-height:6.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent);}
+.cnoteprev ul,.cnoteprev ol{margin:2px 0;padding-left:18px;}
+.cnoteprev .lbl{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
 `;
 document.head.appendChild(css);
 
@@ -109,6 +117,11 @@ view.innerHTML=`
     <span class="nav"><button type="button" class="cbtn" id="cdPrev" aria-label="Previous day">‹</button><button type="button" class="cbtn" id="cdNext" aria-label="Next day">›</button></span></div>
   <div class="cdsum"><span id="cdSum"></span><button type="button" class="tleft" id="cdLeft"></button></div>
   <div class="ctl" id="calTL"></div>
+  <section id="calNoteSec">
+    <div class="sec-label"><span class="dot" style="background:#D9A15C"></span><h2>Note</h2></div>
+    <div id="calNote" data-ph="Write a little about this day — plans, reminders, thoughts…" data-min="80"></div>
+    <div class="cnote-meta"><span>Saved with this day</span><span id="calNoteCount"></span></div>
+  </section>
 </div>`;
 const wrap=document.querySelector('.wrap');
 wrap.insertBefore(view,document.getElementById('tip'));
@@ -138,6 +151,11 @@ sheetWrap.innerHTML=`<div class="dim"></div>
 </div>`;
 document.body.appendChild(sheetWrap);
 const $=id=>document.getElementById(id);
+
+// ---------- day note: stored in the day's row as planNote, synced like ticks ----------
+const noteCount=v=>{const n=rtText(v).length;$('calNoteCount').textContent=n?n+' chars':'';};
+const dayNoteEd=richEditor(document.getElementById('calNote'),v=>{dayObj(sel).planNote=v;noteCount(v);scheduleSave();});
+const planNoteOf=d=>(days[d]&&typeof days[d].planNote==='string')?days[d].planNote:'';
 
 // ---------- helpers ----------
 const P=()=>window.trackerPlan;
@@ -179,7 +197,8 @@ function renderMonth(list){
     evs.slice(0,2).forEach(ev=>{const c=document.createElement('div');c.className='cchip'+(ev.status===2?' cx':'');
       c.style.background=COLORS[ev.color]||COLORS.green;c.textContent=ev.title;b.appendChild(c);});
     if(evs.length>2){const m=document.createElement('div');m.className='cmore';m.textContent='+'+(evs.length-2)+' more';b.appendChild(m);}
-    b.setAttribute('aria-label',dow(d)+' '+d+' '+MONTHS[month0]+(evs.length?', '+evs.length+' event'+(evs.length>1?'s':''):''));
+    if(rtText(planNoteOf(d))){const pn=document.createElement('div');pn.className='npen';pn.textContent='✎';pn.setAttribute('aria-hidden','true');b.appendChild(pn);}
+    b.setAttribute('aria-label',dow(d)+' '+d+' '+MONTHS[month0]+(evs.length?', '+evs.length+' event'+(evs.length>1?'s':''):'')+(rtText(planNoteOf(d))?', has a note':''));
     b.onclick=()=>{if(sel===d){openDay();return;}sel=d;render();};
     g.appendChild(b);
   }
@@ -192,9 +211,13 @@ function renderMonth(list){
     const tt=document.createElement('span');tt.className='ctt';tt.textContent=ev.title;
     r.append(bar,tm,tt,check(ev.status||0,()=>cycle(ev),ev.title));
     r.onclick=()=>openSheet(ev);card.appendChild(r);});
+  const nt=planNoteOf(sel);
+  if(rtText(nt)){const np=document.createElement('div');np.className='cnoteprev';
+    const l=document.createElement('span');l.className='lbl';l.textContent='Note';
+    const body=document.createElement('div');body.innerHTML=rtHtml(nt);np.append(l,body);np.onclick=openDay;card.appendChild(np);}
   const left=tasksLeft();
   const foot=document.createElement('div');foot.className='cempty';foot.style.cursor='pointer';
-  foot.textContent=(evs.length?'':'No events. Tap + to add one. ')+(left?left+' task'+(left>1?'s':'')+' left · ':'')+'Open day ›';
+  foot.textContent=(evs.length||rtText(nt)?'':'No events. Tap + to add one. ')+(left?left+' task'+(left>1?'s':'')+' left · ':'')+'Open day ›';
   if(left){foot.style.color='#F2C14E';}
   foot.onclick=openDay;card.appendChild(foot);
 }
@@ -203,6 +226,7 @@ function renderMonth(list){
 function renderDay(list){
   $('cdDay').textContent=dow(sel)+' '+sel;$('cdMon').textContent=MONTHS[month0];
   const dIso=selIso(),evs=eventsOn(dIso,list);
+  dayNoteEd.set(planNoteOf(sel));noteCount(planNoteOf(sel));
   const done=evs.filter(e=>e.status===1).length,cx=evs.filter(e=>e.status===2).length;
   $('cdSum').textContent=evs.length?('Events '+done+' of '+evs.length+' done'+(cx?' · '+cx+' cancelled':'')):'No events';
   const left=tasksLeft(),lb=$('cdLeft');
