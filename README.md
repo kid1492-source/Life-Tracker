@@ -24,6 +24,23 @@ Personal daily habit tracker: Solat, Taubat, Quran, routines, health metrics, fa
 
 The status bar shows: Synced, Uploading N changes, Upload failed (retrying), or Not synced.
 
+## Habits and scoring
+
+- **Daily habits** count towards the day's %: 5 Solat, Protein (120 g), Wake up, Tahajud, Fajr, Quran, Journaling, Plan for tomorrow, Religion video, Edu video, Deep work, Workout, Solat hajat, CQG practice (18 in all).
+- **Weekly habits** (Monday to Sunday) are scored against their own target and never lower the daily %: Taubat 2×, Time with wife 1×, Call ibu 1×.
+- **Monthly habits:** Visit parents 1×.
+- The **Targets** card (Track and Dashboard) shows this week, and this month with Solat and Protein-day totals.
+
+## Focus and goals (`focus.js`)
+
+- **Today's focus** at the top of Track: up to 3 daily habits with their current streak (or best streak). Ticking there is the same tick as in the habit's own section.
+- **Goals:** a habit for N days in a row with a reward. A goal can allow one missed day: the goal grows by a day and a compensation must be marked done by the next night; otherwise, or on a second miss, it starts again. Progress is worked out from the daily ticks.
+- The focus list and goals are stored in `tracker_reviews` under month key `0000-00` (one entry per setting in `data.weekly`), so they sync like review notes.
+
+## Plan for tomorrow
+
+The **Plan for tomorrow** habit has a button that opens tomorrow in the Calendar with a "Planning tomorrow" banner. **Done planning** ticks the habit on the original day and returns to Track.
+
 ## Calendar
 
 The **Calendar** tab (`calendar.js`) is for planning:

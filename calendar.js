@@ -92,6 +92,13 @@ css.textContent=`
 .cacts .csave{flex:2;background:var(--pine);border-color:var(--pine);color:#fff;}
 .cacts .cdel{color:#F07070;}
 #calview #taskSec{margin-top:4px;}
+.cplan{background:#38301F;border:1px solid #6b5426;border-radius:14px;padding:11px 13px;margin-bottom:12px;}
+.cplan .bt{font-size:13.5px;font-weight:700;color:#F2C14E;}
+.cplan .bs{font-size:12px;color:var(--muted);margin:2px 0 9px;}
+.cplan .bb{display:flex;gap:8px;}
+.cplan .bb button{flex:1;padding:10px;border-radius:10px;font:700 13px 'Inter',sans-serif;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;}
+.cplan .bb button.go{flex:2;background:#43A047;border-color:#43A047;color:#fff;}
+.planbtn{margin-left:auto;background:var(--pine-soft);border:1px solid var(--pine);color:var(--ink);font:700 12px 'Inter',sans-serif;border-radius:9px;padding:7px 10px;white-space:nowrap;cursor:pointer;flex:none;}
 #calNoteSec{margin-bottom:18px;}
 #calNoteSec .rt{margin-top:0;}
 #calNoteSec .rt-ed{min-height:80px;background:var(--card);}
@@ -113,6 +120,8 @@ view.innerHTML=`
   <div class="card" id="calSelCard"></div>
 </div>
 <div id="calDay">
+  <div class="cplan" id="calPlan" style="display:none"><div class="bt" id="cpTitle"></div><div class="bs">Add events, tasks and a note. Then tap Done.</div>
+    <div class="bb"><button type="button" id="cpBack">Back to Track</button><button type="button" class="go" id="cpDone">✓ Done planning</button></div></div>
   <div class="cdh"><button type="button" class="cbtn" id="calBack" aria-label="Back to month">‹ Month</button><span class="d" id="cdDay"></span><span class="s" id="cdMon"></span>
     <span class="nav"><button type="button" class="cbtn" id="cdPrev" aria-label="Previous day">‹</button><button type="button" class="cbtn" id="cdNext" aria-label="Next day">›</button></span></div>
   <div class="cdsum"><span id="cdSum"></span><button type="button" class="tleft" id="cdLeft"></button></div>
@@ -270,12 +279,52 @@ function renderDay(list){
   if(!nowShown)nowLine();
 }
 
+// ---------- "Plan for tomorrow": Track → tomorrow in Calendar → Done ticks the habit ----------
+let planning=null; // {y,m0,d}: the day "Plan for tomorrow" belongs to
+function nextDay(y,m0,d){const t=new Date(y,m0,d+1);return {y:t.getFullYear(),m0:t.getMonth(),d:t.getDate()};}
+async function showDay(y,m0,d){
+  if(y!==year||m0!==month0){await flush();year=y;month0=m0;await loadMonth();}
+  sel=d;
+}
+async function planTomorrow(){
+  planning={y:year,m0:month0,d:sel};
+  const n=nextDay(year,month0,sel);
+  await showDay(n.y,n.m0,n.d);
+  mode='day';window.trackerSetView('cal');render();window.scrollTo(0,0);
+}
+async function backToTrack(done){
+  const src=planning;planning=null;if(!src)return;
+  await showDay(src.y,src.m0,src.d);
+  if(done){const o=dayObj(src.d);o.nPlan=1;save();}
+  mode='month';window.trackerSetView('track');render();
+  const row=document.querySelector('.row[data-key="nPlan"]');
+  if(row)window.scrollTo({top:row.getBoundingClientRect().top+window.scrollY-160});
+}
+$('cpBack').onclick=()=>backToTrack(false);
+$('cpDone').onclick=()=>backToTrack(true);
+function drawPlanBanner(){
+  const b=$('calPlan');
+  const n=planning&&nextDay(planning.y,planning.m0,planning.d);
+  const on=!!n&&n.y===year&&n.m0===month0&&n.d===sel;
+  b.style.display=on?'':'none';
+  if(on)$('cpTitle').textContent='Planning tomorrow · '+dow(sel)+' '+sel+' '+MONTHS[month0].slice(0,3);
+}
+// Button on the Track row "Plan for tomorrow".
+const planRow=document.querySelector('.row[data-key="nPlan"]');
+const planBtn=document.createElement('button');planBtn.type='button';planBtn.className='planbtn';
+planBtn.onclick=e=>{e.stopPropagation();planTomorrow();};
+if(planRow)planRow.appendChild(planBtn);
+function drawPlanBtn(){const t=new Date(year,month0,sel+1);planBtn.textContent='Plan '+DOW[t.getDay()]+' ›';
+  planBtn.setAttribute('aria-label','Plan tomorrow, '+DOW[t.getDay()]+' '+t.getDate()+', in the Calendar');}
+const baseRenderC=render;
+render=function(){baseRenderC();drawPlanBtn();};
+
 function renderCalendar(){
   monthEl.style.display=mode==='month'?'':'none';
   dayEl.style.display=mode==='day'?'':'none';
   const list=items();
   if(mode==='month')renderMonth(list);
-  else{renderDay(list);
+  else{renderDay(list);drawPlanBanner();
     // Task boxes size to their text, which can't be measured while the view is hidden.
     if(taskSec)taskSec.querySelectorAll('.ttxt').forEach(el=>{if(typeof fitTask==='function')fitTask(el);});}
 }

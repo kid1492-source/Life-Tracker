@@ -197,6 +197,15 @@
   .ref-top{display:flex;align-items:baseline;}
   .ref-top .edit-link{margin-left:auto;}
 
+  .tg-h{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:12px 0 2px;}
+  .tg-h+.sum-row{border-top:none;}
+  #sumCard .s-val.hit,#dashTargets .s-val.hit{color:#8fc98f;}
+  .pbadge{margin-left:auto;text-align:right;flex:none;}
+  .pbadge .n{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap;}
+  .pbadge .n.ok{color:#8fc98f;}
+  .pbadge .pp{display:flex;gap:3px;justify-content:flex-end;margin-top:4px;}
+  .pbadge .pp i{width:14px;height:5px;border-radius:9px;background:var(--track);}
+  .pbadge .pp i.d{background:#43A047;}
   .foot{text-align:center;margin-top:22px;font-size:11.5px;color:var(--muted);}
   .saved{opacity:0;transition:opacity .3s;}.saved.show{opacity:1;}
 
@@ -395,16 +404,13 @@
         </div>
         <div class="plog" id="pLog"></div>
       </div>
-      <div class="row" data-key="weights"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Weight training</div><div class="freq">2× per week</div></div></div>
-      <div class="row" data-key="boxing"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Boxing</div><div class="freq">2× per week</div></div></div>
-      <div class="row" data-key="running"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Running / elevation</div><div class="freq">2× per week</div></div></div>
     </div>
   </section>
 
   <section>
     <div class="sec-label"><span class="dot"></span><h2>Financial</h2></div>
     <div class="card">
-      <div class="row" data-key="cqg"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Trading — CQG practice</div><div class="freq">3× per week</div></div></div>
+      <div class="row" data-key="cqg"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Trading — CQG practice</div><div class="freq">Daily</div></div></div>
     </div>
   </section>
 
@@ -453,11 +459,12 @@
   </section>
 
   <!-- Monthly summary -->
-  <div class="sum-head"><span class="dot"></span><h2 id="sumHead">August Targets</h2></div>
+  <div class="sum-head"><span class="dot"></span><h2 id="sumHead">Targets</h2></div>
   <div class="sum-card" id="sumCard"></div>
 
   <div id="dash">
     <div class="kpis" id="kpis"></div>
+    <div class="chart"><h3>Targets</h3><p class="sub">Weekly habits count Mon–Sun; monthly ones for the month.</p><div class="sum-card" id="dashTargets" style="box-shadow:none;border:0;padding:0 4px;background:none"></div></div>
     <div class="chart"><h3>Daily completion</h3><p class="sub" id="dailySub"></p><div id="cDaily"></div><div class="legend"><span><i style="background:#0ca30c"></i>70%+</span><span><i style="background:#fab219"></i>40–69%</span><span><i style="background:#d03b3b"></i>under 40%</span></div>
       <details><summary>Table view</summary><div id="tDaily"></div></details></div>
     <div class="chart"><h3>Prayers</h3><p class="sub">Each column is a day.</p><div id="cPrayers"></div></div>
@@ -1019,10 +1026,17 @@ const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let REAL=new Date(); // today; updated when the date changes while the app stays open
 let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
-const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal',
-  'dRelVid','dEduVid','dDeep','xWorkout',
-  'dHajat','tahajud','taubat','weights','boxing','running','cqg','wife','ibu','parents'];
-const MAX=6+BOOL_KEYS.length; // 5 solat + protein + checkboxes
+// Daily habits count towards the day's %. Weekly (Mon–Sun) and monthly habits are scored
+// against their own target instead, so they never pull a day down.
+const DAILY_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal',
+  'dRelVid','dEduVid','dDeep','xWorkout','dHajat','tahajud','cqg'];
+const PERIOD_HABITS=[
+  {key:'taubat',name:'Taubat / deep prayer',per:'week',target:2},
+  {key:'wife',name:'Time with wife',per:'week',target:1},
+  {key:'ibu',name:'Call ibu',per:'week',target:1},
+  {key:'parents',name:'Visit parents',per:'month',target:1}];
+const BOOL_KEYS=DAILY_KEYS.concat(PERIOD_HABITS.map(h=>h.key));
+const MAX=6+DAILY_KEYS.length; // 5 solat + protein + daily checkboxes
 
 function blankDay(){const o={solat:[0,0,0,0,0],solatNotes:['','','','',''],protein:0,sleep:null,note:'',mood:0};
   BOOL_KEYS.forEach(k=>o[k]=0); return o;}
@@ -1037,25 +1051,52 @@ function storeKey(){return 'tracker:'+year+'-'+String(month0+1).padStart(2,'0');
 function dow(d){return DOW[new Date(year,month0,d).getDay()];}
 function dayPoints(o){if(!o)return 0;let p=o.solat.filter(s=>s===1).length;
   if(o.protein>=120)p++;
-  BOOL_KEYS.forEach(k=>{if(o[k]===1)p++;}); return p;}
+  DAILY_KEYS.forEach(k=>{if(o[k]===1)p++;}); return p;}
 
-const TARGETS=[
-  {name:'Solat',target:d=>d*5,type:'solat',hue:'amber'},
-  {name:'Protein ≥120g',target:d=>d,type:'proteinDays'},
-  {name:'Weight training',target:8,key:'weights'},
-  {name:'Boxing',target:8,key:'boxing'},
-  {name:'Running / elevation',target:8,key:'running'},
-  {name:'CQG practice',target:12,key:'cqg'},
-  {name:'Taubat / deep prayer',target:8,key:'taubat'},
-  {name:'Time with wife',target:4,key:'wife'},
-  {name:'Call ibu',target:4,key:'ibu'},
-  {name:'Visit parents',target:1,key:'parents'},
-];
-function tgtVal(t){return typeof t.target==='function'?t.target(dim()):t.target;}
-function metric(t){let c=0,n=dim();for(let d=1;d<=n;d++){const o=days[d];if(!o)continue;
-  if(t.type==='solat')c+=o.solat.filter(s=>s===1).length;
-  else if(t.type==='proteinDays')c+=(o.protein>=120?1:0);
-  else if(t.key)c+=(o[t.key]===1?1:0);} return c;}
+// ---- targets: weekly habits per Mon–Sun week, monthly habits and totals per month ----
+// nbr holds the months before and after the one on screen, so a week that crosses a
+// month boundary is counted correctly.
+let nbr={};
+function dayAt(y,m0,d){const t=new Date(y,m0,d),Y=t.getFullYear(),M=t.getMonth(),D=t.getDate();
+  if(Y===year&&M===month0)return days[D];
+  const k=Y+'-'+M;return nbr[k]&&nbr[k][D];}
+function weekStart(y,m0,d){const t=new Date(y,m0,d),back=(t.getDay()+6)%7;return new Date(y,m0,d-back);}
+function weekCount(key,y,m0,d){const s0=weekStart(y,m0,d);let c=0;
+  for(let i=0;i<7;i++){const o=dayAt(s0.getFullYear(),s0.getMonth(),s0.getDate()+i);if(o&&o[key]===1)c++;}return c;}
+function monthCount(key){let c=0;for(let d=1;d<=dim();d++){const o=days[d];if(o&&o[key]===1)c++;}return c;}
+function periodCount(h,d){return h.per==='week'?weekCount(h.key,year,month0,d):monthCount(h.key);}
+const MONTH_TOTALS=[
+  {name:'Solat',target:()=>dim()*5,count:()=>{let c=0;for(let d=1;d<=dim();d++){const o=days[d];if(o)c+=o.solat.filter(s=>s===1).length;}return c;}},
+  {name:'Protein ≥120g days',target:()=>dim(),count:()=>{let c=0;for(let d=1;d<=dim();d++){const o=days[d];if(o&&o.protein>=120)c++;}return c;}}];
+function weekLabel(d){const s0=weekStart(year,month0,d),e0=new Date(s0.getFullYear(),s0.getMonth(),s0.getDate()+6);
+  const f=t=>DOW[t.getDay()]+' '+t.getDate()+(t.getMonth()!==month0?' '+MONTHS[t.getMonth()].slice(0,3):'');
+  const now=new Date(REAL.getFullYear(),REAL.getMonth(),REAL.getDate()),cur=now>=s0&&now<=e0;
+  return (cur?'This week · ':'Week · ')+f(s0)+' – '+f(e0);}
+function targetRow(name,c,t){const ok=c>=t,pct=Math.min(100,t?c/t*100:0);
+  const r=document.createElement('div');r.className='sum-row';
+  r.innerHTML='<div class="sum-top"><span class="s-name"></span><span class="s-val'+(ok?' hit':'')+'"></span></div><div class="sbar"><span></span></div>';
+  r.querySelector('.s-name').textContent=name;r.querySelector('.s-val').textContent=(ok?'✓ ':'')+c+' / '+t;
+  const b=r.querySelector('.sbar span');b.style.width=pct+'%';if(ok)b.style.background='#43A047';return r;}
+function renderTargets(host,d){
+  if(!host)return;host.innerHTML='';
+  const hd=t=>{const h=document.createElement('div');h.className='tg-h';h.textContent=t;host.appendChild(h);};
+  hd(weekLabel(d));
+  PERIOD_HABITS.filter(h=>h.per==='week').forEach(h=>host.appendChild(targetRow(h.name,periodCount(h,d),h.target)));
+  hd('This month · '+MONTHS[month0]);
+  PERIOD_HABITS.filter(h=>h.per==='month').forEach(h=>host.appendChild(targetRow(h.name,periodCount(h,d),h.target)));
+  MONTH_TOTALS.forEach(t=>host.appendChild(targetRow(t.name,t.count(),t.target())));
+}
+// Progress badge on each weekly / monthly habit row.
+function renderPeriodBadges(){
+  PERIOD_HABITS.forEach(h=>{const row=document.querySelector('.row[data-key="'+h.key+'"]');if(!row)return;
+    let b=row.querySelector('.pbadge');
+    if(!b){b=document.createElement('div');b.className='pbadge';b.innerHTML='<div class="n"></div><div class="pp"></div>';row.appendChild(b);}
+    const c=periodCount(h,sel),ok=c>=h.target;
+    const n=b.querySelector('.n');n.textContent=(ok?'✓ ':'')+Math.min(c,99)+'/'+h.target+' this '+h.per;n.classList.toggle('ok',ok);
+    const pp=b.querySelector('.pp');pp.innerHTML='';
+    for(let i=0;i<h.target;i++){const x=document.createElement('i');if(i<c)x.className='d';pp.appendChild(x);}
+  });
+}
 
 // ---- persistence ----
 // Every change is written to the device straight away (no delay), so the device copy and
@@ -1081,6 +1122,12 @@ async function loadData(){
     BOOL_KEYS.forEach(k=>{if(o[k]===true)o[k]=1;else if(o[k]===false||o[k]===null||o[k]===undefined)o[k]=0;});
     if(typeof o.note!=='string')o.note='';if(typeof o.mood!=='number')o.mood=0;}});
   days=d;review=rv;
+  // previous and next month, for weeks that cross a month boundary
+  const nb={};
+  for(const off of [-1,1]){const t=new Date(year,month0+off,1),k=t.getFullYear()+'-'+t.getMonth();
+    try{const r=await window.storage.get('tracker:'+t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0'));
+      const p=r&&r.value?JSON.parse(r.value):null;nb[k]=(p&&p.days)||{};}catch(e){nb[k]={};}}
+  nbr=nb;
 }
 async function loadMonth(){
   await loadData();
@@ -1262,11 +1309,7 @@ document.getElementById('prevM').onclick=async()=>{await flush();month0--;if(mon
 document.getElementById('nextM').onclick=async()=>{await flush();month0++;if(month0>11){month0=0;year++;}loadMonth();};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)flush();});
 
-// build summary rows
 const sumCard=document.getElementById('sumCard');
-TARGETS.forEach((t,i)=>{const r=document.createElement('div');r.className='sum-row';
-  r.innerHTML=`<div class="sum-top"><span class="s-name">${t.name}</span><span class="s-val" id="sv${i}"></span></div>
-    <div class="sbar"><span id="sb${i}"></span></div>`;sumCard.appendChild(r);});
 
 // ---- render ----
 function render(){
@@ -1275,7 +1318,7 @@ function render(){
   const before=(year<REAL.getFullYear())||(year===REAL.getFullYear()&&month0<REAL.getMonth());
   const todayD=isCur?REAL.getDate():(before?32:0);
   document.getElementById('monthTitle').innerHTML=MONTHS[month0]+'<br><b>'+year+'</b>';
-  document.getElementById('sumHead').textContent=MONTHS[month0]+' Targets';
+  document.getElementById('sumHead').textContent='Targets';
   // calendar cells
   document.querySelectorAll('.cell:not(.empty)').forEach(b=>{
     const d=+b.dataset.d,o=days[d],pts=dayPoints(o),pct=Math.round(pts/MAX*100);
@@ -1312,11 +1355,9 @@ function render(){
   const mpct=Math.round(tot/(MAX*n)*100);
   document.getElementById('monthPct').textContent=mpct+'%';
   document.getElementById('ringFill').style.strokeDashoffset=201-(201*mpct/100);
-  // summary
-  TARGETS.forEach((t,i)=>{const c=metric(t),tv=tgtVal(t),pct=Math.min(100,c/tv*100);
-    const vEl=document.getElementById('sv'+i),bEl=document.getElementById('sb'+i);
-    vEl.textContent=c+' / '+tv;vEl.classList.toggle('hit',c>=tv);
-    bEl.style.width=pct+'%';bEl.style.background=t.hue==='amber'?'var(--amber)':'var(--pine)';});
+  // targets and weekly/monthly progress
+  renderTargets(sumCard,sel);
+  renderPeriodBadges();
   renderReview();
 }
 document.querySelectorAll('#moodRow span').forEach(b=>b.addEventListener('click',()=>{const o=dayObj(sel),m=+b.dataset.m;o.mood=o.mood===m?0:m;save();}));
@@ -1716,7 +1757,7 @@ const EARLY=[['mWake','Wake up'],['tahajud','Tahajud'],['mFajr','Fajr (early)']]
 const earlyWin=o=>!!o&&EARLY.every(([k])=>o[k]===1);
 const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],
   ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['taubat','Taubat'],
-  ['weights','Weights'],['boxing','Boxing'],['running','Running'],['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
+  ['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
 const NS='http://www.w3.org/2000/svg';
 const GREEN='#0ca30c',AMBER='#fab219',RED='#d03b3b',OFF='#3C3B37';
 function tl(p){return p>=70?GREEN:(p>=40?AMBER:RED);}
@@ -1738,6 +1779,7 @@ function editLink(d,secId){const b=document.createElement('button');b.type='butt
   b.onclick=()=>{if(d)sel=d;window.trackerSetView('track');render();
     const el=document.getElementById(secId);if(el)window.scrollTo({top:el.offsetTop-14});};return b;}
 function renderDashboard(){
+  renderTargets(document.getElementById('dashTargets'),(year===REAL.getFullYear()&&month0===REAL.getMonth())?REAL.getDate():sel);
   const n=dim(),e=elapsedDays();
   const pts=[];for(let d=1;d<=n;d++)pts.push(dayPoints(days[d]));
   const done=pts.slice(0,e);
@@ -1899,5 +1941,6 @@ setInterval(checkDate,60000);
 loadMonth();
 </script>
 <script src="calendar.js"></script>
+<script src="focus.js"></script>
 </body>
 </html>
