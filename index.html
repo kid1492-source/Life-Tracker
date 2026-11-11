@@ -344,7 +344,6 @@
     <div class="card">
       <div class="row" data-key="dJournal"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Journaling</div><div class="freq">Reflect on the day</div></div></div>
       <div class="row" data-key="nPlan"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Plan for tomorrow</div><div class="freq">Set the day ahead</div></div></div>
-      <div class="row" data-key="nSleep10"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Sleep</div><div class="freq">By 10:00 PM</div></div></div>
     </div>
   </section>
 
@@ -1020,7 +1019,7 @@ const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let REAL=new Date(); // today; updated when the date changes while the app stays open
 let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
-const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal','nSleep10',
+const BOOL_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal',
   'dRelVid','dEduVid','dDeep','xWorkout',
   'dHajat','tahajud','taubat','weights','boxing','running','cqg','wife','ibu','parents'];
 const MAX=6+BOOL_KEYS.length; // 5 solat + protein + checkboxes
@@ -1715,7 +1714,7 @@ render=function(){baseWoRender();renderWorkout();};
 // Early morning win: the first three habits of the day, all done.
 const EARLY=[['mWake','Wake up'],['tahajud','Tahajud'],['mFajr','Fajr (early)']];
 const earlyWin=o=>!!o&&EARLY.every(([k])=>o[k]===1);
-const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],['nSleep10','Sleep by 10'],
+const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],
   ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['taubat','Taubat'],
   ['weights','Weights'],['boxing','Boxing'],['running','Running'],['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
 const NS='http://www.w3.org/2000/svg';
