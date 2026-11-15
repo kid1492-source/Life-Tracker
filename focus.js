@@ -247,14 +247,14 @@ function drawGoals(){
     const f=document.createElement('div');f.className='gfoot';
     if(e.won&&!g.claimed){const cl=document.createElement('button');cl.type='button';cl.className='flink';cl.style.marginRight='14px';cl.textContent='Claim reward';
       cl.onclick=async()=>{await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{claimed:true})));render();};f.appendChild(cl);}
-    if(g.mode==='comp'&&!e.won&&!e.compDue){const ec=document.createElement('button');ec.type='button';ec.className='flink';ec.style.marginRight='14px';
-      ec.textContent='Edit compensation';ec.onclick=()=>editComp(g);f.appendChild(ec);}
+    if(!e.won){const ec=document.createElement('button');ec.type='button';ec.className='flink';ec.style.marginRight='14px';
+      ec.textContent='Edit goal';ec.onclick=()=>newGoal(g);f.appendChild(ec);}
     const rm=document.createElement('button');rm.type='button';rm.className='flink';rm.textContent=e.won?'Remove':'Remove goal';
     rm.onclick=async()=>{if(!e.won&&!confirm('Remove this goal?'))return;await setSetting('goal:'+g.id,'');render();};
     f.appendChild(rm);c.appendChild(f);
     host.appendChild(c);
   });
-  if(gs.length<MAX_GOALS){const b=document.createElement('button');b.type='button';b.className='gnew';b.textContent='＋ Set a goal with a reward';b.onclick=newGoal;host.appendChild(b);}
+  if(gs.length<MAX_GOALS){const b=document.createElement('button');b.type='button';b.className='gnew';b.textContent='＋ Set a goal with a reward';b.onclick=()=>newGoal();host.appendChild(b);}
 }
 // Change what the compensation for a missed day is, e.g. "2 solat hajat".
 function editComp(g){
@@ -268,14 +268,20 @@ function editComp(g){
   });
   setTimeout(()=>inp.focus(),50);
 }
-function newGoal(){
-  let key='tahajud',n=7,mode='comp';
+// New goal, or (with g) edit one: days, reward, the rule for a missed day and the compensation.
+// An edited goal keeps its habit, start day and any made-up days.
+function newGoal(g){
+  const edit=!!g;
+  let key=edit?g.key:'tahajud',n=edit?g.days:7,mode=edit?(g.mode==='comp'?'comp':'strict'):'comp';
   const body=document.createElement('div');
   const lab=t=>{const p=document.createElement('p');p.className='clbl';p.textContent=t;return p;};
   const selEl=document.createElement('select');selEl.className='csel';selEl.setAttribute('aria-label','Habit');
   DAILY_KEYS.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=label(k);if(k===key)o.selected=true;selEl.appendChild(o);});
+  if(edit)selEl.disabled=true;
   const sHint=document.createElement('p');sHint.className='fhint';
-  const setS=()=>{const st=streakStart(key,n);
+  const setS=()=>{
+    if(edit){const a=fromIso(g.start);sHint.textContent='Keeps counting from '+DOW[a.getDay()]+' '+a.getDate()+' '+MONTHS[a.getMonth()].slice(0,3)+'. To change the habit, remove this goal and set a new one.';return;}
+    const st=streakStart(key,n);
     if(!st.n){sHint.textContent='Starts counting today.';return;}
     const a=fromIso(st.start),z=fromIso(st.end);
     sHint.textContent='Counts your current streak: '+st.n+' day'+(st.n>1?'s':'')+' ('+DOW[a.getDay()]+' '+a.getDate()+(st.n>1?' – '+DOW[z.getDay()]+' '+z.getDate():'')+').';};
@@ -284,19 +290,23 @@ function newGoal(){
     opts.forEach(([v,t])=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.classList.toggle('on',v===cur);
       b.onclick=()=>{w.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');on(v);};w.appendChild(b);});return w;};
   const reward=document.createElement('input');reward.className='cin';reward.maxLength=100;reward.placeholder='e.g. Buffet with wifey 🍽️';
-  const comp=document.createElement('input');comp.className='cin';comp.maxLength=100;comp.placeholder='e.g. Sedekah RM10';
+  const comp=document.createElement('input');comp.className='cin';comp.maxLength=100;comp.placeholder='e.g. 2 solat hajat';
+  if(edit){reward.value=g.reward||'';comp.value=g.comp||'';}
+  const dayOpts=[[3,'3 days'],[7,'7 days'],[14,'14 days'],[30,'30 days']];
+  if(!dayOpts.some(([v])=>v===n))dayOpts.push([n,n+' days']);
   const compBox=document.createElement('div');compBox.append(lab('Compensation'),comp);
   const hint=document.createElement('p');hint.className='fhint';
   const setHint=()=>{hint.textContent=mode==='comp'?'One missed day is allowed: the goal grows by 1 day and you do the compensation by the next night. Another miss starts again from 0.':'Any missed day starts again from 0.';compBox.style.display=mode==='comp'?'':'none';};
-  body.append(lab('Habit'),selEl,sHint,lab('Days in a row'),chips([[3,'3 days'],[7,'7 days'],[14,'14 days'],[30,'30 days']],n,v=>{n=v;setS();}),
+  body.append(lab('Habit'),selEl,sHint,lab('Days in a row'),chips(dayOpts,n,v=>{n=v;setS();}),
     lab('Reward'),reward,lab('If I miss a day'),chips([['comp','1 miss allowed, with compensation'],['strict','Start again from 0']],mode,v=>{mode=v;setHint();}),compBox,hint);
   setHint();setS();
-  openSheet('New goal',body,async()=>{
+  openSheet(edit?'Edit goal':'New goal',body,async()=>{
     if(!reward.value.trim())return 'Add a reward to work towards.';
     if(mode==='comp'&&!comp.value.trim())return 'Add the compensation for a missed day.';
-    const g={id:newId(),key,days:n,reward:reward.value.trim(),mode,comp:mode==='comp'?comp.value.trim():'',
-      start:streakStart(key,n).start,compDone:[],claimed:false};
-    await setSetting('goal:'+g.id,JSON.stringify(g));
+    const ng=edit?Object.assign({},g,{days:n,reward:reward.value.trim(),mode,comp:mode==='comp'?comp.value.trim():(g.comp||'')})
+      :{id:newId(),key,days:n,reward:reward.value.trim(),mode,comp:mode==='comp'?comp.value.trim():'',
+        start:streakStart(key,n).start,compDone:[],claimed:false};
+    await setSetting('goal:'+ng.id,JSON.stringify(ng));
   });
   setTimeout(()=>reward.focus(),50);
 }
