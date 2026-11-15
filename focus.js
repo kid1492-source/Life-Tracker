@@ -40,6 +40,8 @@ css.textContent=`
 .gpips span{height:28px;border-radius:8px;background:var(--track);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--muted);}
 .gpips span.on{background:#43A047;color:#fff;}
 .gpips span.miss{background:#6b5426;color:#F2C14E;}
+.gpips span.made{background:#6b5426;color:#F2C14E;box-shadow:inset 0 0 0 1.5px #F2C14E;}
+.gcomp .ctx{color:var(--ink);font-weight:600;}
 .gpips span.today{box-shadow:inset 0 0 0 2px var(--ink);}
 .gcomp{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;line-height:1.4;}
 .gcomp .gb{margin-left:auto;background:#43A047;color:#fff;border:0;font:700 12.5px 'Inter',sans-serif;border-radius:9px;padding:8px 12px;white-space:nowrap;cursor:pointer;}
@@ -126,6 +128,8 @@ function best(key){
 // A goal counts days in a row with the habit ticked, from its start day up to today.
 // "comp" goals allow one missed day: the goal grows by one day and the compensation must be
 // marked done by the end of the next day. Otherwise (or on a second miss) it starts again.
+// Today stays open, unless the habit is marked ✕ for today: then today is the miss at once,
+// so the compensation can be done the same day.
 function evalGoal(g){
   const today=todayIso(),comp=g.mode==='comp',done=g.compDone||[];
   let start=g.start,target=g.days,progress=0,miss=null,resetOn=null,won=null;
@@ -134,7 +138,7 @@ function evalGoal(g){
       resetOn=d;start=d;target=g.days;progress=0;miss=null;}
     const v=val(g.key,d);
     if(v===1){progress++;if(progress>=target){won=d;break;}continue;}
-    if(d===today)break;                                    // today is still open
+    if(d===today&&v!==2)break;                             // today is still open
     if(comp&&!miss){miss=d;target++;continue;}             // the one allowed miss
     resetOn=addDays(d,1);start=addDays(d,1);target=g.days;progress=0;miss=null;
   }
@@ -215,7 +219,9 @@ function drawGoals(){
     if(e.won){s.append(g.claimed?'Reward claimed ✓ — well done! ':'Goal reached! Your reward: ',rw);}
     else{
       const left=e.target-e.progress;
-      if(e.miss){const md=fromIso(e.miss);s.append('Missed '+DOW[md.getDay()]+' — goal is now '+e.target+' days · Reward: ',rw);}
+      if(e.miss&&(g.compDone||[]).includes(e.miss)){const md=fromIso(e.miss);
+        s.append(DOW[md.getDay()]+' made up ✓ · goal is now '+e.target+' days · Reward: ',rw,' · '+left+' more day'+(left>1?'s':''));}
+      else if(e.miss){const md=fromIso(e.miss);s.append('Missed '+DOW[md.getDay()]+' — goal is now '+e.target+' days · Reward: ',rw);}
       else{s.append('Reward: ',rw,' · '+left+' more day'+(left>1?'s':''));}
       if(e.resetOn&&e.resetOn>=addDays(today,-2)&&!e.miss){const rd=fromIso(e.resetOn);s.append(' · started again '+DOW[rd.getDay()]+' '+rd.getDate());}
     }
@@ -223,26 +229,44 @@ function drawGoals(){
     const pips=document.createElement('div');pips.className='gpips';
     for(let i=0;i<e.target;i++){const d=addDays(e.start,i),p=document.createElement('span');
       const dd=fromIso(d);p.textContent=DOW[dd.getDay()];
-      if(val(g.key,d)===1)p.className='on';else if(d===e.miss)p.className='miss';
+      if(val(g.key,d)===1)p.className='on';
+      else if(d===e.miss&&(g.compDone||[]).includes(d)){p.className='made';p.textContent=DOW[dd.getDay()]+' ✓';p.title=d+' made up';}
+      else if(d===e.miss)p.className='miss';
       if(d===today)p.classList.add('today');p.title=d;pips.appendChild(p);}
     c.appendChild(pips);
     if(e.compDue){const cp=document.createElement('div');cp.className='gcomp';
-      const md=fromIso(addDays(e.miss,1));const tx=document.createElement('div');
+      const md=fromIso(addDays(e.miss,1)),missedToday=e.miss===today;const tx=document.createElement('div');
       const b1=document.createElement('b');b1.style.color='#F2C14E';b1.textContent='Compensation: ';
-      tx.append(b1,g.comp||'—');const br=document.createElement('div');br.style.color='var(--muted)';
-      br.textContent='Do it by '+DOW[md.getDay()]+' night to keep the streak. Another miss starts again.';tx.appendChild(br);
+      const ct=document.createElement('span');ct.className='ctx';ct.textContent=g.comp||'—';
+      const ch=document.createElement('button');ch.type='button';ch.className='flink';ch.style.marginLeft='8px';ch.textContent='change';ch.onclick=()=>editComp(g);
+      tx.append(b1,ct,ch);const br=document.createElement('div');br.style.color='var(--muted)';
+      br.textContent=(missedToday?'Missed today. Do it tonight, or by '+DOW[md.getDay()]+' night,':'Do it by '+DOW[md.getDay()]+' night')+' to keep the streak. Another miss starts again.';tx.appendChild(br);
       const b=document.createElement('button');b.type='button';b.className='gb';b.textContent='✓ Done';
       b.onclick=async()=>{const cd=(g.compDone||[]).concat(e.miss);await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{compDone:cd})));render();};
       cp.append(tx,b);c.appendChild(cp);}
     const f=document.createElement('div');f.className='gfoot';
     if(e.won&&!g.claimed){const cl=document.createElement('button');cl.type='button';cl.className='flink';cl.style.marginRight='14px';cl.textContent='Claim reward';
       cl.onclick=async()=>{await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{claimed:true})));render();};f.appendChild(cl);}
+    if(g.mode==='comp'&&!e.won&&!e.compDue){const ec=document.createElement('button');ec.type='button';ec.className='flink';ec.style.marginRight='14px';
+      ec.textContent='Edit compensation';ec.onclick=()=>editComp(g);f.appendChild(ec);}
     const rm=document.createElement('button');rm.type='button';rm.className='flink';rm.textContent=e.won?'Remove':'Remove goal';
     rm.onclick=async()=>{if(!e.won&&!confirm('Remove this goal?'))return;await setSetting('goal:'+g.id,'');render();};
     f.appendChild(rm);c.appendChild(f);
     host.appendChild(c);
   });
   if(gs.length<MAX_GOALS){const b=document.createElement('button');b.type='button';b.className='gnew';b.textContent='＋ Set a goal with a reward';b.onclick=newGoal;host.appendChild(b);}
+}
+// Change what the compensation for a missed day is, e.g. "2 solat hajat".
+function editComp(g){
+  const body=document.createElement('div');
+  const inp=document.createElement('input');inp.className='cin';inp.maxLength=100;inp.value=g.comp||'';inp.placeholder='e.g. 2 solat hajat';
+  const h=document.createElement('p');h.className='fhint';h.textContent='What you will do to make up for a missed day. Applies to this goal from now on.';
+  body.append(inp,h);
+  openSheet('Compensation',body,async()=>{
+    const v=inp.value.trim();if(!v)return 'Add what you will do to make up for a missed day.';
+    await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{comp:v})));
+  });
+  setTimeout(()=>inp.focus(),50);
 }
 function newGoal(){
   let key='tahajud',n=7,mode='comp';
