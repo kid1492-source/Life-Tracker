@@ -151,7 +151,7 @@ const cal=document.querySelector('.wrap .cal');
 const box=document.createElement('div');box.className='trackOnly';box.id='focusBox';
 box.innerHTML=`<div class="fcard"><div class="fh"><b id="fTitle">Today's focus</b><span class="fd" id="fDay"></span>
   <button type="button" class="flink" id="fEdit">Edit</button></div><div id="fRows"></div></div><div id="gBox"></div>`;
-cal.parentNode.insertBefore(box,cal);
+cal.parentNode.insertBefore(box,cal.nextSibling);   // calendar first, then focus and goals
 
 const wrap=document.createElement('div');wrap.className='csheet-wrap';
 wrap.innerHTML=`<div class="dim"></div><div class="csheet" role="dialog" aria-modal="true" aria-labelledby="fsTitle">

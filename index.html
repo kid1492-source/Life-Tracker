@@ -2161,7 +2161,7 @@ function renderDashboard(){
     document.body.classList.toggle('dashmode',v==='dash');
     document.body.classList.toggle('calmode',v==='cal');
     Object.keys(tabs).forEach(k=>tabs[k].classList.toggle('on',k===v));
-    document.getElementById('saveBar').style.display=v==='track'?'':'none';
+    document.getElementById('saveBar').style.display=v==='dash'?'none':'';   // Sync now on Track and Plan
     try{localStorage.setItem('view',v);}catch(e){}
     if(v==='dash')renderDashboard();
     if(v==='cal'&&window.renderCalendar)window.renderCalendar();

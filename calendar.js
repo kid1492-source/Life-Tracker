@@ -66,7 +66,7 @@ css.textContent=`
 .cnow .ln{height:2px;background:#F07070;position:relative;}
 .cnow .ln::before{content:'';position:absolute;left:-12px;top:-4px;width:10px;height:10px;border-radius:50%;background:#F07070;}
 .ctlempty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:16px;color:var(--muted);font-size:13px;text-align:center;margin-bottom:18px;}
-.cfab{position:fixed;right:max(18px,calc(50% - 262px));bottom:calc(24px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;background:var(--pine);color:#fff;border:0;font-size:30px;line-height:1;box-shadow:0 6px 18px rgba(0,0,0,.5);cursor:pointer;display:none;}
+.cfab{position:fixed;right:max(18px,calc(50% - 262px));bottom:calc(112px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;background:var(--pine);color:#fff;border:0;font-size:30px;line-height:1;box-shadow:0 6px 18px rgba(0,0,0,.5);cursor:pointer;display:none;}
 .calmode .cfab{display:block;}
 .csheet-wrap{position:fixed;inset:0;z-index:90;display:none;}
 .csheet-wrap.open{display:block;}
