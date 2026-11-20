@@ -1,0 +1,1647 @@
+<title>Doorway</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+:root{
+  --navy:#0E1823; --cream:#F3ECE0; --card:#FBF7F0;
+  --amber:#D9A24A; --amb2:#8F5A0E; --ink:#1A2433; --mut:#5A6472; --line:#DDD2BF;
+  --red:#C8553D; --redbg:#F3D9D3; --redink:#9B3A2A; --ok:#2F6246;
+  --disp:'Cormorant Garamond',Georgia,serif; --sans:'DM Sans',system-ui,sans-serif;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--navy);color:var(--cream);font-family:var(--sans);overflow:hidden}
+#stage{position:fixed;inset:0;z-index:0}
+#stage canvas{display:block;width:100%;height:100%}
+.ui{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  pointer-events:none}
+.ui > *{pointer-events:auto}
+.topbar{display:flex;align-items:center;gap:10px;height:48px;flex-shrink:0;font-size:12px;
+  letter-spacing:2px;text-transform:uppercase;font-weight:700;color:#CBD6E2;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.topbar .dots{margin-left:auto;display:flex;gap:5px}
+.backb{background:none;border:0;color:#9FB0C4;font:700 11px/1 var(--sans);letter-spacing:1.6px;text-transform:uppercase;padding:9px 12px 9px 0;cursor:pointer}
+.restb{background:none;border:0;color:#7D8EA2;font:700 11px/1 var(--sans);letter-spacing:1.4px;text-transform:uppercase;padding:9px 0 9px 12px;cursor:pointer}
+.restb.solo{margin-left:auto}
+.modal{position:fixed;inset:0;z-index:60;background:rgba(7,12,19,.74);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.modal .card{background:var(--cream);color:var(--ink);border-radius:22px;padding:22px 20px 18px;width:100%;max-width:430px}
+.modal h3{font:700 19px/1.25 var(--serif);margin:0 0 7px}
+.modal p{font:400 14px/1.5 var(--sans);color:#4A5663;margin:0 0 16px}
+.topbar i{width:7px;height:7px;border-radius:50%;background:#56687C;display:block;transition:background .3s}
+.topbar i.on{background:var(--amber)}
+.veil{position:fixed;inset:0;background:#070C12;z-index:3;opacity:0;pointer-events:none;transition:opacity .42s}
+.crawl{position:fixed;inset:0;z-index:4;background:#070C12;display:flex;align-items:center;justify-content:center;
+  padding:0 34px;opacity:0;pointer-events:none;transition:opacity .55s;overflow:hidden}
+.crawl.on{opacity:1;pointer-events:auto}
+.drift{position:absolute;inset:-30%;opacity:.55;
+  background-image:
+   radial-gradient(1.7px 1.7px at 18% 14%,rgba(236,224,200,.55),transparent 60%),
+   radial-gradient(1.2px 1.2px at 71% 9%,rgba(236,224,200,.38),transparent 60%),
+   radial-gradient(1.5px 1.5px at 42% 33%,rgba(217,162,74,.42),transparent 60%),
+   radial-gradient(1.1px 1.1px at 88% 41%,rgba(236,224,200,.34),transparent 60%),
+   radial-gradient(1.6px 1.6px at 9% 57%,rgba(236,224,200,.44),transparent 60%),
+   radial-gradient(1.2px 1.2px at 59% 68%,rgba(217,162,74,.34),transparent 60%),
+   radial-gradient(1.4px 1.4px at 31% 82%,rgba(236,224,200,.40),transparent 60%),
+   radial-gradient(1.1px 1.1px at 79% 91%,rgba(236,224,200,.30),transparent 60%);
+  background-size:300px 300px;animation:drift 64s linear infinite}
+@keyframes drift{from{background-position:0 0}to{background-position:0 -600px}}
+.crawl p{position:relative;max-width:460px;text-align:center;margin:0;opacity:0;transition:opacity .34s}
+.crawl-dots{position:absolute;left:0;right:0;bottom:78px;display:flex;gap:7px;justify-content:center}
+.crawl-dots i{width:6px;height:6px;border-radius:50%;background:#2E3B4E;display:block;transition:background .3s}
+.crawl-dots i.on{background:var(--amber)}
+.crawl-hint{position:absolute;left:0;right:0;bottom:48px;text-align:center;font:500 12px var(--sans);
+  color:#5D6E85;transition:opacity .4s}
+.crawl-skip{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:none;border:0;
+  color:#64758B;font:700 11px/1 var(--sans);letter-spacing:2px;text-transform:uppercase;padding:12px;cursor:pointer}
+.crawl b{display:block;font-family:var(--disp);font-size:clamp(25px,7.2vw,33px);line-height:1.13;
+  font-weight:600;color:var(--cream);margin:0 0 11px}
+.crawl span{display:block;font-size:15.5px;line-height:1.52;color:#9FB0C4}
+@media (prefers-reduced-motion:reduce){.drift{animation:none}}
+.veil.on{opacity:1}
+.spacer{flex:1;min-height:0;pointer-events:none;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;gap:8px;padding-top:6px}
+.hint{background:rgba(217,162,74,.94);color:#2A1E0C;font:700 12.5px/1 var(--sans);padding:10px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.45);transition:opacity .45s}
+.live{font:700 12px/1.4 var(--sans);color:#EBDCC2;background:rgba(10,18,27,.82);padding:9px 15px;border-radius:14px;max-width:320px;text-align:center}
+.hero{padding:40px 10px calc(30px + env(safe-area-inset-bottom,0px));max-width:520px;width:100%;margin:0 auto;
+  background:linear-gradient(to top,var(--navy) 42%,rgba(14,24,35,.90) 72%,rgba(14,24,35,0))}
+.h1{font-family:var(--disp);font-size:clamp(31px,8.6vw,39px);line-height:1.07;font-weight:600;margin:0 0 12px;color:var(--cream)}
+.lede{font-size:15px;line-height:1.5;color:#B8C5D2;margin:0 0 20px}
+.kick{font-size:11px;letter-spacing:2.6px;text-transform:uppercase;color:var(--amber);font-weight:700;margin:0 0 10px}
+.sheet{background:var(--cream);color:var(--ink);border-radius:26px 26px 0 0;margin:0 -16px;
+  padding:20px 22px calc(24px + env(safe-area-inset-bottom,0px));max-height:68vh;overflow-y:auto;
+  box-shadow:0 -14px 40px rgba(0,0,0,.45)}
+.sheet.plain{border-radius:0;max-height:none;flex:1;display:flex;flex-direction:column;gap:13px;padding-top:30px}
+.eyeb{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--amb2);font-weight:700;margin:0 0 8px}
+.q{font-family:var(--disp);font-size:27px;line-height:1.15;font-weight:600;margin:0 0 5px;color:var(--ink);text-wrap:balance}
+.scene-note{font-size:13px;line-height:1.4;color:var(--mut);margin:0 0 10px;font-style:italic}
+.why-t{background:none;border:0;padding:0 0 8px;font:700 12.5px/1 var(--sans);color:var(--amb2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;display:block}
+.why{font-size:13px;line-height:1.46;color:var(--ink);margin:0 0 10px;padding-left:11px;border-left:2.5px solid var(--amber);text-align:left}
+.clin{font-size:11.5px;color:#8a8275;margin:0 0 13px}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;align-items:flex-start;gap:11px;border:1.5px solid var(--line);border-radius:13px;padding:12px 14px;
+  font-size:15px;line-height:1.34;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;
+  font-family:inherit;width:100%;transition:background .15s,border-color .15s}
+.opt .bx{width:18px;height:18px;border-radius:5px;border:1.6px solid #C9BCA4;flex-shrink:0;margin-top:1px;position:relative}
+.opt[aria-pressed="true"]{border-color:var(--amber);background:#F6E7C9}
+.opt[aria-pressed="true"] .bx{background:var(--amber);border-color:var(--amber)}
+.opt[aria-pressed="true"] .bx::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;
+  border:solid #3A2A0A;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.opt.ns{border-style:dashed}
+.btn{display:block;width:100%;background:var(--navy);color:var(--cream);border:0;border-radius:30px;padding:16px;
+  font:700 15px/1.2 var(--sans);cursor:pointer;margin-top:14px}
+.btn.amb{background:var(--amber);color:#2A1E0C}
+.btn.red{background:var(--red);color:#fff}
+.btn[disabled]{opacity:.42;cursor:default}
+.btn:focus-visible,.opt:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.ghost{display:block;width:100%;background:none;border:0;color:var(--mut);font:500 13.5px var(--sans);padding:12px;cursor:pointer;text-align:center}
+.pill{display:inline-block;border-radius:999px;padding:6px 14px;font:700 11px/1.2 var(--sans);letter-spacing:2px;
+  text-transform:uppercase;background:#F6E7C9;color:var(--amb2);margin-bottom:4px}
+.pill.red{background:var(--redbg);color:var(--redink)}
+.p{font-size:15px;line-height:1.52;color:var(--mut);margin:0}
+.p.b{color:var(--ink)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px}
+.box .k{font:700 10.5px/1.2 var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--amb2);margin-bottom:8px}
+.box .l{font-size:13.5px;line-height:1.55;color:var(--ink)}
+.box .l b{display:inline-block;min-width:17px}
+.row{display:flex;gap:11px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--line)}
+.row .n{width:27px;height:27px;border-radius:50%;background:var(--navy);color:var(--cream);font:700 12px/27px var(--sans);text-align:center;flex-shrink:0}
+.row .n.g{background:var(--ok)} .row .n.a{background:var(--amb2)}
+.row .t{font-size:14.5px;line-height:1.4;color:var(--ink)}
+.row .t s{display:block;text-decoration:none;font-size:12.5px;color:var(--mut);margin-top:2px}
+.fade{animation:fade .45s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none}}
+.note{font-size:12px;color:#8a8275;margin:10px 0 0;text-align:center}
+</style>
+
+<div id="stage"></div>
+<div class="ui" id="ui"></div>
+<div class="veil" id="veil"></div>
+<div class="crawl" id="crawl"><div class="drift"></div><p id="crawlText"></p><div class="crawl-dots" id="crawlDots"></div><div class="crawl-hint" id="crawlHint">Tap to continue</div><button class="crawl-skip" id="crawlSkip">Skip</button></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+  "three/examples/jsm/":"https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+/* Doorway — screening walkthrough. Draft for clinical review.
+   Sources: Module 5, WHO lab manual 6th ed (2021), AUA/ASRM guideline.
+   Screening only. Never a diagnosis. No laboratory values anywhere.      */
+
+const CONTEXT=[
+ {id:'months',q:'How long have you and your partner been trying for a child?',
+  opts:[['Not trying yet',0],['Under 6 months',3],['6 to 12 months',8],['1 to 2 years',16],['Over 2 years',30]]},
+ {id:'partnerAge',q:'How old is your partner?',sub:'We ask because it changes how quickly you should both be seen.',
+  opts:[['Under 30',28],['30 to 35',33],['36 to 39',37],['40 or over',41],['Prefer not to say',0]]},
+ {id:'priorChild',q:'Have you ever fathered a child?',opts:[['Yes','y'],['No','n'],['Not sure','u']]}
+];
+
+/* f = camera focus [x,y,z,zoom] · sn = what the camera is showing · act = prop to animate */
+const Q=[
+ /* ---------- 1 · HEAD OFFICE (brain and pituitary) ---------- */
+ {s:0,q:'Are you taking, or have you recently taken, any of these?',
+  note:'Testosterone and steroids switch off the body’s own signal to make sperm. Most men are never told this.',
+  sn:'A crate has arrived at head office. Nobody ordered it.',
+  f:[0.80,14.52,0.80,2.2],act:'crate',
+  o:[['Testosterone — injection, gel or tablet','testosterone'],['Anabolic steroids','testosterone'],
+     ['Gym supplements I’m unsure about','supplements'],['None of these','-'],['Prefer not to say','-',1]]},
+ {s:0,q:'Have you noticed any of these changes in yourself?',
+  note:'These can be signs your testosterone has dropped. Easy to miss, and easy to check with one blood test.',
+  sn:'The lamp over the director’s desk is flickering.',
+  f:[0,15.02,0,2.4],act:'lamp',
+  o:[['Less interest in sex','hypogonadism'],['Fewer morning erections','hypogonadism'],
+     ['Shaving less often than I used to','hypogonadism'],['Tenderness or swelling of breast tissue','hypogonadism'],
+     ['None of these','-']]},
+ {s:0,q:'Have you ever had any of these?',
+  note:'A small gland under the brain sends the signal that starts sperm production. These can damage it.',
+  sn:'Two clerks are pulling the old maintenance records.',
+  f:[-0.80,14.70,0.15,2.3],act:'archive',
+  o:[['A pituitary or hormone condition','pituitary'],['A serious head injury','pituitary'],
+     ['Radiotherapy to the head','pituitary'],['None of these','-'],['Not sure','-',1]]},
+ {s:0,q:'Are you taking any of these medicines or supplements?',
+  note:'Several very common prescriptions lower sperm count. Most men taking them have never been warned.',
+  sn:'The storeman is going down the supply shelves.',
+  f:[0.70,14.62,-0.72,2.3],act:'store',
+  o:[['A tablet for hair loss','meds'],['Long-term strong painkillers','meds'],['Sulfasalazine','meds'],
+     ['Medication for depression or anxiety','meds'],['Herbal or fertility supplements','supplements'],['None of these','-']]},
+
+ /* ---------- 2 · PRODUCTION FLOOR (testes) ---------- */
+ {s:1,q:'Have you noticed a lump, swelling, or new pain in either testicle?',
+  sn:'An inspector is going over the casing with a torch.',
+  f:[0.29,7.45,1.50,2.3],act:'inspect',
+  o:[['A lump or swelling','lump'],['An ache or dragging heaviness','varicocele'],
+     ['Sudden severe pain, right now','acutePain'],['No','-'],['Not sure','-',1]]},
+ {s:1,q:'Were either of your testicles undescended at birth, or did you have an operation down there as a boy?',
+  note:'One of the strongest clues there is.',
+  sn:'The original build drawings are out on the table.',
+  f:[0.46,6.30,-0.18,2.2],act:'plans',
+  o:[['One testicle was undescended at birth','udt1'],['Both were','udt2'],
+     ['I had an operation down there as a boy','surg'],['None of these','-'],['Not sure — nobody ever told me','unknown',1]]},
+ {s:1,q:'Has either testicle ever been injured, twisted, operated on, or swollen with mumps?',
+  note:'Mumps only affects fertility if it came after puberty and made the testicles swell.',
+  sn:'One bay is scorched and taped off.',
+  f:[-0.55,6.18,0.04,2.2],act:'scorch',
+  o:[['Mumps after about age 12, with swollen testicles','mumps'],['A significant injury to the testicles','surg'],
+     ['A twisted testicle','surg'],['Surgery on a testicle','surg'],['None of these','-'],['Not sure','-',1]]},
+ {s:1,q:'Have you ever had chemotherapy, radiotherapy to the pelvis, or a genetic diagnosis?',
+  sn:'A whole bay sits behind plastic sheeting.',
+  f:[-0.09,7.72,-0.50,2.2],act:'cordon',
+  o:[['Chemotherapy','chemo'],['Radiotherapy to the pelvis or abdomen','chemo'],
+     ['A genetic condition I’ve been told about','genetic'],['None of these','-'],['Not sure','-',1]]},
+ {s:1,q:'Are your testicles regularly exposed to heat?',
+  note:'Sperm are made a few degrees below body temperature. That is why the testicles hang outside the body.',
+  sn:'A worker is up at the wall gauge, watching the needle.',
+  f:[0.52,8.45,-1.50,2.3],act:'thermo',
+  o:[['Hot tubs, saunas or long hot baths','heat'],['Laptop on my lap regularly','heat'],
+     ['Hot work — long-haul driving, welding, kitchens','heat'],
+     ['A fever or illness in the last 3 months','fever'],['None of these','-']]},
+ {s:2,q:'Do you have difficulty getting an erection, keeping one, or ejaculating?',
+  note:'Common, treatable, and it changes what a test result means — so it is worth saying.',
+  sn:'The inlet valve is jammed half way.',
+  f:[-0.30,1.08,1.00,2.2],act:'shutter',
+  o:[['Difficulty getting an erection','sexual'],['Difficulty keeping one','sexual'],
+     ['Difficulty or inability to ejaculate','sexual'],['Pain on ejaculation','sexual'],
+     ['None of these','-'],['Prefer not to say','-',1]]},
+ {s:2,q:'Have you ever had a sexually transmitted infection, a swollen epididymis, or repeated urine infections?',
+  note:'Scarring can block the tube long afterwards. No judgement here.',
+  sn:'The glass run has silted up.',
+  f:[3.00,1.06,0.50,2.5],act:'flood',
+  o:[['A sexually transmitted infection','sti'],['A painful, swollen epididymis','sti'],
+     ['Repeated urine infections','sti'],['None of these','-'],['Not sure','-',1]]},
+ {s:2,q:'Have you had any of these operations?',
+  note:'Sperm travel up a tube about as thick as a pencil lead. Some operations block it or cut it.',
+  sn:'A blank flange has been clamped across the pipe.',
+  f:[4.20,1.10,0.60,2.6],act:'barrier',
+  o:[['A vasectomy','vasectomy'],['A hernia repair','obstruct'],
+     ['Surgery on the groin, scrotum or prostate','obstruct'],['None of these','-'],['Not sure','-',1]]},
+ {s:2,q:'Do any of these apply to you?',
+  note:'Semen can travel backwards into the bladder instead of out. Diabetes and some prostate tablets cause it.',
+  sn:'Two ways out of the manifold. One of them runs backwards.',
+  f:[5.20,1.20,0.20,2.8],act:'gates',
+  o:[['Very little fluid when I ejaculate','retro'],['Cloudy urine straight afterwards','retro'],
+     ['I have diabetes','retro'],['I take a tablet for my prostate or waterworks','retro'],['None of these','-']]}
+];
+
+/* asked after the result, where they are actually actionable */
+const LIFEQ=[['I smoke or vape','smoking'],['I drink alcohol regularly','alcohol'],
+ ['I use cannabis','cannabis'],['I\u2019m carrying extra weight','weight'],
+ ['I work with chemicals, pesticides or solvents','toxins'],
+ ['We have sex about once a week, or less','infrequent'],
+ ['We use a lubricant during sex','lube']];
+const SEC=[
+ {n:'Head Office',kick:'Section one of three',
+  t:'The board decides what gets made.',
+  d:'Up here they meet, they agree a number, and they send the order down. Nothing is produced below until this room says so.',
+  cam:[0,15.0,0,3.4]},
+ {n:'Production Floor',kick:'Section two of three',
+  t:'The order has arrived. The line starts.',
+  d:'This is where the product is actually made — about seventy-four days from raw material to finished unit. Everything you change up here shows up three months later.',
+  cam:[0,7.6,0,3.8]},
+ {n:'The Road Out',kick:'Section three of three',
+  t:'Finished units leave by pipe.',
+  d:'Loaded, pushed out, delivered. A perfect plant still fails if the way out is shut.',
+  cam:[0.5,1.35,-0.1,3.5]}
+];
+const ZONE=[{n:'Head Office'},{n:'Production Floor'},{n:'The Road Out'}];
+
+function triage(f){
+  const h=k=>!!f[k];
+  if(h('lump')||h('acutePain'))
+    return{k:'urgent',rule:'R-01',title:'Please see a doctor today.',
+      why:'You’ve told us about a lump or sudden pain in a testicle. That needs looking at now — not after a fertility test, and not next week.',
+      extra:'It is very often nothing serious. But it is the one thing that should never wait, so we’ve stopped here on purpose.'};
+  const early=[];
+  if(h('udt2')||h('chemo')||h('vasectomy')||h('genetic')) early.push('a known cause in your history');
+  if(h('pituitary')) early.push('something that can affect the signal from the brain');
+  if(h('hypogonadism')||h('testosterone')) early.push('signs that your hormones need checking');
+  if(f.partnerAge>=36 && f.months>=12) early.push('your partner’s age with the time you’ve been trying');
+  if(early.length)
+    return{k:'soon',rule:'R-04/05/06',title:'Don’t wait. See a doctor soon.',
+      why:'Because of '+early.join(', and ')+', waiting the usual twelve months isn’t the right plan for you. Ask for a semen analysis at the same visit.'};
+  if(f.months>=12)
+    return{k:'now',rule:'R-10',title:'Now is the right time to get tested.',
+      why:'You’ve been trying twelve months or more. Nobody — not you, not a doctor — can know what’s leaving the loading bay without counting it once.'};
+  if(f.partnerAge>=36 && f.months>=6)
+    return{k:'soon',rule:'NICE',title:'Don’t wait the full year.',
+      why:'With your partner aged 36 or over, the usual advice is to start looking after about six months rather than twelve. See a doctor and ask for a semen analysis.'};
+  if(h('sexual')||h('obstruct')||h('sti')||h('udt1')||h('mumps')||h('surg')||h('varicocele')||h('retro')||h('meds'))
+    return{k:'gp',rule:'R-11/12',title:'Worth a conversation with a doctor.',
+      why:'Nothing here needs acting on today, but you’ve mentioned something a doctor should know about — and they can examine you in a couple of minutes.'};
+  return{k:'plan',rule:'R-13',title:'Nothing here needs acting on yet.',
+    why:'That isn’t the same as “you’re fine” — a man with a problem usually feels completely well. It means nothing you’ve told us needs a doctor today.',
+    extra:'The test is available whenever you want to know. Here’s what’s worth doing either way.'};
+}
+const LIFE={smoking:'Stop smoking — it lowers both count and movement.',weight:'Work towards a healthy weight.',
+  heat:'Cut the heat: no hot tubs, no laptop on your lap.',alcohol:'Keep alcohol down.',cannabis:'Stop cannabis.',
+  toxins:'Use protection around chemicals at work.',
+  testosterone:'Stop testosterone or steroids — under a doctor, never suddenly on your own. It is the single biggest thing on this list.',
+  supplements:'Stop unproven supplements. None are shown to work.',
+  lube:'Swap to a fertility-friendly lubricant — most kill sperm.',
+  infrequent:'Aim for sex every 2 to 3 days across the month.'};
+const LBL={testosterone:'exogenous testosterone / AAS',supplements:'unproven supplements',
+  hypogonadism:'symptoms of hypogonadism',pituitary:'possible central cause',varicocele:'scrotal ache (?varicocele)',
+  udt1:'unilateral cryptorchidism',udt2:'bilateral cryptorchidism',surg:'testicular trauma or surgery',
+  mumps:'mumps orchitis',chemo:'gonadotoxic treatment',genetic:'known genetic diagnosis',heat:'scrotal heat exposure',
+  fever:'febrile illness within 3 months',smoking:'smoking',alcohol:'alcohol',cannabis:'cannabis',weight:'raised BMI',
+  toxins:'occupational exposure',vasectomy:'vasectomy',obstruct:'possible surgical obstruction',
+  sti:'prior genital infection',sexual:'erectile or ejaculatory dysfunction',retro:'features of retrograde ejaculation',
+  meds:'gonadotoxic medication',infrequent:'low coital frequency',lube:'spermicidal lubricant',
+  lump:'TESTICULAR LUMP',acutePain:'ACUTE TESTICULAR PAIN'};
+
+/* ============================= 3D ============================= */
+/* Three robotic organs on one spine. The shapes are the real organs;
+   only the material is machine. Head office is the cranial shell with the
+   pituitary slung under it; the production floor is a testis, its coiled
+   seminiferous tubule run round the inside wall; the outlet is the
+   prostate manifold, the vesicle tanks and the urethra out to the gate. */
+let SC=null;
+async function boot3D(){
+  const THREE=await import('three');
+  const {RoundedBoxGeometry}=await import('three/examples/jsm/geometries/RoundedBoxGeometry.js');
+  const {RoomEnvironment}=await import('three/examples/jsm/environments/RoomEnvironment.js');
+
+  const STEEL={metalness:.86,roughness:.26,envMapIntensity:1.0};
+  const DARK ={metalness:.55,roughness:.50,envMapIntensity:.45};
+  const BRASS={metalness:.80,roughness:.32,envMapIntensity:.90};
+  const GLASS={metalness:.10,roughness:.08,transparent:true,opacity:.30,envMapIntensity:1.2};
+  const SHIRT=[0xA8382A,0xC2831F,0x2F6246,0x3A5E8C,0x8E3A33,0xD4A84E,0x6A5742,0x74404E];
+  const SKIN=[0xE9CFAB,0xDCBE95,0xC49C71,0xA87F56];
+  let _s=7;const rnd=()=>{_s=(_s*16807)%2147483647;return (_s-1)/2147483646;};
+  const pick=a=>a[Math.floor(rnd()*a.length)];
+
+  const geo=new Map();
+  const bg=(w,h,d)=>{const k=w.toFixed(3)+h.toFixed(3)+d.toFixed(3);if(geo.has(k))return geo.get(k);
+    const r=Math.min(Math.min(w,h,d)*.26,.05);
+    const g=r>.006?new RoundedBoxGeometry(w,h,d,2,r):new THREE.BoxGeometry(w,h,d);geo.set(k,g);return g;};
+  const mat=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.78,metalness:.06,envMapIntensity:.3},o||{}));
+  const box=(w,h,d,c,x,y,z,o)=>{const m=new THREE.Mesh(bg(w,h,d),mat(c,o));m.position.set(x,y,z);m.castShadow=1;m.receiveShadow=1;return m;};
+  const cyl=(a,b,h,c,x,y,z,s,o)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(a,b,h,s||16),mat(c,o));m.position.set(x,y,z);m.castShadow=1;m.receiveShadow=1;return m;};
+  const sph=(r,c,x,y,z,o)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,18,14),mat(c,o));m.position.set(x,y,z);m.castShadow=1;return m;};
+  const tubeOf=(pts,r,c,o,seg)=>new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),seg||90,r,12,false),mat(c,o));
+  const ringAt=(p,t,R,w,c,o)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(R,w,8,22),mat(c,o));m.position.copy(p);m.lookAt(p.clone().add(t));return m;};
+  const angd=(a,b)=>{let d=((a-b+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;return Math.abs(d);};
+  const CUTC=Math.PI*0.75, CUTW=1.52;
+
+  function person(x,y,z,o){o=o||{};const sh=o.shirt||pick(SHIRT),sk=pick(SKIN);
+    const g=new THREE.Group();
+    g.add(cyl(.05,.05,.19,0x2E3A48,-.065,.095,0,8));g.add(cyl(.05,.05,.19,0x2E3A48,.065,.095,0,8));
+    g.add(box(.33,.44,.22,sh,0,.42,0));
+    const aL=box(.08,.32,.10,sh,-.198,.44,0),aR=box(.08,.32,.10,sh,.198,.44,0);
+    aL.rotation.z=o.armL||0;aR.rotation.z=o.armR||0;g.add(aL);g.add(aR);
+    g.userData.aL=aL;g.userData.aR=aR;
+    g.add(sph(.052,sk,-.205,.28,0));g.add(sph(.052,sk,.205,.28,0));
+    g.add(sph(.228,sk,0,.86,0));
+    const hat=sph(.242,0xD9A24A,0,.90,0,BRASS);hat.scale.set(1,.56,1);g.add(hat);
+    g.traverse(m=>{m.castShadow=false});
+    g.position.set(x,y,z);g.rotation.y=o.rot!==undefined?o.rot:(rnd()-.5)*3;g.scale.setScalar(o.size||.9);
+    return g;}
+  function sperm(stage){const st=(stage===undefined)?2:stage;const g=new THREE.Group();
+    const h=sph(.085,0xC4D0DD,0,0,0,STEEL);h.scale.set(1.55,.86,1);g.add(h);
+    g.add(sph(.034,0x8FE3B4,.07,.02,.038,{emissive:0x1E7A4A,emissiveIntensity:1.6,roughness:.3}));
+    if(st>=1)for(let i=0;i<5;i++){const r=cyl(.046,.046,.028,i%2?0xD9A24A:0x7C8EA3,-.115-i*.040,0,0,12,i%2?BRASS:STEEL);
+      r.rotation.z=Math.PI/2;g.add(r);}
+    const tail=[];
+    if(st>=2)for(let i=0;i<8;i++){const w=.040-i*.004;const sg=box(.046,w,w,i%2?0xA6B6C8:0x7C8EA3,-.32-i*.050,0,0,STEEL);tail.push(sg);g.add(sg);}
+    g.userData.tail=tail;g.traverse(m=>{m.castShadow=false});return g;}
+  function shellOf(RX,RY,RZ,col){const g=new THREE.Group();
+    const sh=new THREE.Mesh(new THREE.SphereGeometry(1,68,46,CUTC+CUTW/2,Math.PI*2-CUTW),
+      mat(col,Object.assign({side:THREE.DoubleSide},STEEL)));
+    sh.scale.set(RX,RY,RZ);sh.castShadow=1;sh.receiveShadow=1;g.add(sh);
+    const li=new THREE.Mesh(new THREE.SphereGeometry(1,52,34,CUTC+CUTW/2+.02,Math.PI*2-CUTW-.04),
+      mat(0x394A5E,Object.assign({side:THREE.BackSide},DARK)));
+    li.scale.set(RX*.955,RY*.955,RZ*.955);g.add(li);
+    return g;}
+  const surfOf=(RX,RY,RZ)=>(th,ph,k)=>new THREE.Vector3(-Math.cos(ph)*Math.sin(th)*RX*(k||1),
+    Math.cos(th)*RY*(k||1),Math.sin(ph)*Math.sin(th)*RZ*(k||1));
+
+  /* ---------------------------------------------------------- stage */
+  const host=document.getElementById('stage');
+  const rn=new THREE.WebGLRenderer({antialias:true});
+  rn.setPixelRatio(Math.min(devicePixelRatio,2));
+  rn.shadowMap.enabled=true;rn.shadowMap.type=THREE.PCFSoftShadowMap;
+  rn.outputEncoding=THREE.sRGBEncoding;rn.toneMapping=THREE.ACESFilmicToneMapping;rn.toneMappingExposure=.95;
+  host.appendChild(rn.domElement);
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0x101A26);
+  const pm=new THREE.PMREMGenerator(rn);scene.environment=pm.fromScene(new RoomEnvironment(),.5).texture;
+  const hemi=new THREE.HemisphereLight(0x8AA2C0,0x241C14,.46);scene.add(hemi);
+  const key=new THREE.DirectionalLight(0xFFE7C6,1.02);key.position.set(13,22,11);
+  key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.radius=2.6;key.shadow.bias=-.0009;
+  const kc=key.shadow.camera;kc.left=-12;kc.right=12;kc.top=22;kc.bottom=-6;kc.near=1;kc.far=64;scene.add(key);
+  const fill=new THREE.DirectionalLight(0x7E9CC4,.36);fill.position.set(-12,8,-9);scene.add(fill);
+
+  const people=[];
+
+  /* ================= OUTLET (floor 0) ================= */
+  const GO=new THREE.Group();scene.add(GO);
+  GO.add(box(11.5,.5,7.0,0x6E7E90,2.0,-.3,0,{metalness:.4,roughness:.55,envMapIntensity:.4}));
+  for(const [x,z] of [[-2.8,-2.9],[6.8,-2.9],[-2.8,2.9],[6.8,2.9]])
+    GO.add(cyl(.26,.3,.7,0x5E6C7E,x,-.9,z,12,STEEL));
+  /* prostate manifold, wrapped round the outlet */
+  GO.add(box(2.0,1.5,1.7,0xAEBCCC,0,.80,0,STEEL));
+  for(const f of [-.45,.45])GO.add(box(2.06,.05,1.76,0x7F90A4,0,.80+f,0,STEEL));
+  for(const [x,z] of [[-.85,.78],[.85,.78],[-.85,-.78]])for(const y of [.30,1.30])
+    GO.add(sph(.05,0xD3DEEA,x,y,z,STEEL));
+  /* the inlet valve: the loading bay door */
+  const shutter=box(.9,.9,.12,0x7E93AC,-.30,.85,.92,STEEL);GO.add(shutter);
+  GO.add(ringAt(new THREE.Vector3(-.30,.85,.97),new THREE.Vector3(0,0,1),.52,.06,0xD9A24A,BRASS));
+  /* vesicle tanks */
+  [-1,1].forEach(s=>{
+    GO.add(cyl(.42,.36,1.15,0xBFCBD8,s*1.85,.92,s<0?-.30:-1.35,20,STEEL));
+    for(let i=0;i<4;i++)GO.add(new THREE.Mesh(new THREE.TorusGeometry(.41,.045,8,20),mat(0xD9A24A,BRASS))
+      .translateX(s*1.85).translateY(.52+i*.30).translateZ(s<0?-.30:-1.35).rotateX(Math.PI/2));
+    GO.add(sph(.37,0xBFCBD8,s*1.85,1.55,s<0?-.30:-1.35,STEEL));
+    GO.add(tubeOf([new THREE.Vector3(s*1.55,.62,s<0?-.32:-1.25),new THREE.Vector3(s*1.05,.72,-.55),
+                   new THREE.Vector3(s*.72,.80,-.18)],.10,0x7C8EA3,STEEL,30));});
+  /* the urethra: the road out */
+  const road=[new THREE.Vector3(.95,.82,.05),new THREE.Vector3(2.4,.80,.40),
+              new THREE.Vector3(4.0,.78,.62),new THREE.Vector3(5.7,.76,.70)];
+  const rc=new THREE.CatmullRomCurve3(road);
+  const seg=(u0,u1)=>{const q=[];for(let i=0;i<=40;i++)q.push(rc.getPointAt(u0+(u1-u0)*i/40));return q;};
+  const W0=.30,W1=.60;
+  GO.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg(0,W0)),60,.26,14,false),mat(0x9FB0C4,STEEL)));
+  GO.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg(W1,1)),60,.26,14,false),mat(0x9FB0C4,STEEL)));
+  const glass=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg(W0-.004,W1+.004)),60,.25,14,false),mat(0xBFE6F0,GLASS));
+  GO.add(glass);
+  for(const u of [W0,W1,.14,.84])GO.add(ringAt(rc.getPointAt(u),rc.getTangentAt(u),.30,.05,0xD9A24A,BRASS));
+  /* the carrier: what the product rides out in */
+  const carrier=new THREE.Group();
+  const swarm=[];
+  for(let i=0;i<3;i++){
+    const sp=sperm(2);sp.scale.setScalar(1.55-i*.16);
+    sp.position.set(-i*.34,(i%2?.07:-.06),(i===1?.11:-.09));
+    swarm.push(sp);carrier.add(sp);}
+  GO.add(carrier);
+  const carrierAt=u=>{const p=rc.getPointAt(Math.max(0,Math.min(1,u))),t=rc.getTangentAt(Math.max(0,Math.min(1,u)));
+    carrier.position.copy(p);carrier.lookAt(p.clone().add(t));carrier.rotateY(Math.PI/2);};
+  carrierAt(0.04);
+  /* product already in the glass run */
+  for(let i=0;i<3;i++){const u=W0+.05+i*.07,p=rc.getPointAt(u),t=rc.getTangentAt(u);
+    const sp=sperm(2);sp.scale.setScalar(1.0);sp.position.copy(p);sp.lookAt(p.clone().add(t));sp.rotateY(Math.PI/2);GO.add(sp);}
+  /* the barrier: a blank flange clamped across the road */
+  const bu=.70,bp=rc.getPointAt(bu),bt=rc.getTangentAt(bu);
+  const barrier=new THREE.Group();barrier.position.copy(bp);barrier.lookAt(bp.clone().add(bt));
+  barrier.add(new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.10,24),mat(0xC8553D,{emissive:0x6B2016,emissiveIntensity:.5,metalness:.6,roughness:.4})).rotateX(Math.PI/2));
+  barrier.add(new THREE.Mesh(new THREE.TorusGeometry(.44,.06,8,26),mat(0xD9A24A,BRASS)));
+  barrier.visible=false;GO.add(barrier);
+  /* standing fluid in the glass run */
+  const flood=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg(W0,W1)),50,.22,14,false),
+    mat(0x4E7FA8,{transparent:true,opacity:.62,roughness:.1,metalness:.4}));
+  flood.visible=false;GO.add(flood);
+  /* two ways out: forward, or back to the bladder */
+  const gp=rc.getPointAt(1),gt=rc.getTangentAt(1);
+  const gate=new THREE.Group();gate.position.copy(gp);gate.lookAt(gp.clone().add(gt));GO.add(gate);
+  gate.add(new THREE.Mesh(new THREE.CylinderGeometry(.46,.46,.2,22),mat(0x8FA3B8,STEEL)).rotateX(Math.PI/2));
+  const gateA=new THREE.Mesh(new THREE.TorusGeometry(.44,.07,10,26),mat(0x6ED19A,{emissive:0x156B3C,emissiveIntensity:.8,metalness:.5,roughness:.35}));
+  gate.add(gateA);
+  const wheel=new THREE.Group();wheel.position.set(0,.74,0);
+  wheel.add(new THREE.Mesh(new THREE.TorusGeometry(.32,.045,8,24),mat(0xD9A24A,BRASS)));
+  for(let k=0;k<4;k++)wheel.add(cyl(.026,.026,.62,0x8FA3B8,0,0,0,8,STEEL).rotateZ(Math.PI/2+k/4*Math.PI*2));
+  gate.add(wheel);gate.add(cyl(.07,.07,.5,0x8FA3B8,0,.42,0,10,STEEL));
+  const gateB=new THREE.Group();
+  gateB.add(tubeOf([new THREE.Vector3(4.6,.78,.66),new THREE.Vector3(4.7,.95,-.6),new THREE.Vector3(4.6,1.0,-1.5)],.22,0xE87D6A,
+    {emissive:0x8A2A1C,emissiveIntensity:.45,metalness:.6,roughness:.4},40));
+  gateB.visible=false;GO.add(gateB);
+  /* deck, dispatch board, crew */
+  GO.add(box(3.2,.14,1.7,0x55637A,2.6,.1,-2.0,DARK));
+  for(let i=0;i<6;i++)GO.add(cyl(.02,.02,.46,0x8FA3B8,1.3+i*.55,.37,-2.8,8,STEEL));
+  GO.add(box(3.2,.04,.04,0xD9A24A,2.6,.62,-2.8,BRASS));
+  const sched=box(.95,.65,.08,0x44668F,2.4,.95,-2.78,DARK);GO.add(sched);
+  for(let i=0;i<3;i++)GO.add(box(.74,.09,.05,0xD8C9AC,2.4,1.12-i*.2,-2.72,{roughness:.6}));
+  const driver=person(5.1,.17,-.55,{rot:-2.5,shirt:0x2F6246,size:.95});driver.visible=false;GO.add(driver);
+  [[1.9,-2.0,-2.3],[3.4,-2.1,-2.0]].forEach(([x,z,r],i)=>{const p=person(x,.17,z,{rot:r,size:.95});people.push(p);GO.add(p);});
+
+  /* ================= TESTIS (floor 1) ================= */
+  const GT=new THREE.Group();GT.position.set(0,7.6,0);scene.add(GT);
+  const TRX=2.0,TRY=2.7,TRZ=2.0;
+  const tShell=shellOf(TRX,TRY,TRZ,0xA9B8C9);GT.add(tShell);
+  const shellMat=tShell.children[0].material;
+  const tsurf=surfOf(TRX,TRY,TRZ);
+  for(const f of [-.62,-.22,.22,.62]){const th=Math.acos(f);
+    for(let i=0;i<=20;i++){const ph=CUTC+CUTW/2+(Math.PI*2-CUTW)*i/20;
+      GT.add(sph(.038,0xD3DEEA,...tsurf(th,ph,1.01).toArray(),STEEL));}}
+  /* cooling fins and fans: this plant must run below body temperature */
+  const fans=[];
+  [[CUTC+1.5,.1],[CUTC+2.4,-.5]].forEach(([ph,f])=>{
+    const th=Math.acos(f),p=tsurf(th,ph,1.02),n=p.clone().normalize();
+    const g=new THREE.Group();g.position.copy(p);g.lookAt(p.clone().add(n));GT.add(g);
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(.34,.05,8,22),mat(0x8FA3B8,STEEL)));
+    const bl=new THREE.Group();g.add(bl);
+    for(let k=0;k<4;k++){const b=box(.58,.05,.1,0xA6BBD4,0,0,.04,STEEL);b.rotation.z=k*Math.PI/4;bl.add(b);}
+    fans.push(bl);
+    for(let k=0;k<4;k++)g.add(box(.70,.035,.05,0x7F90A4,0,-.22+k*.145,-.06,STEEL));});
+  /* the seminiferous tubule, hugging the wall, cut where the section cuts */
+  const raw=[],TURNS=6,N=820;
+  for(let i=0;i<=N;i++){const u=i/N;
+    const y=-TRY*.72+TRY*1.46*u,f=y/TRY;
+    const rr=TRX*Math.sqrt(Math.max(.05,1-f*f))*0.84;
+    const a=TURNS*Math.PI*2*u;
+    raw.push({p:new THREE.Vector3(Math.cos(a)*rr,y,Math.sin(a)*rr),cut:angd(Math.PI-a,CUTC)<CUTW/2+.05});}
+  const LINES=[];let runp=[];
+  for(const q of raw){if(q.cut){if(runp.length>4)LINES.push(new THREE.CatmullRomCurve3(runp));runp=[];}else runp.push(q.p);}
+  if(runp.length>4)LINES.push(new THREE.CatmullRomCurve3(runp));
+  const tubeMeshes=[];
+  LINES.forEach(c=>{
+    const tm=new THREE.Mesh(new THREE.TubeGeometry(c,120,.105,10,false),mat(0xE6D9BE,{metalness:.35,roughness:.45,envMapIntensity:.5}));
+    tubeMeshes.push(tm);GT.add(tm);
+    for(const u of [.25,.75])GT.add(ringAt(c.getPointAt(u),c.getTangentAt(u),.14,.026,0xD9A24A,BRASS));
+    for(const u of [0,1]){const p=c.getPointAt(u);
+      const cap=new THREE.Mesh(new THREE.CircleGeometry(.106,14),mat(0xD9A24A,Object.assign({side:THREE.DoubleSide},BRASS)));
+      cap.position.copy(p);cap.lookAt(p.clone().add(c.getTangentAt(u)));GT.add(cap);}});
+  /* product moving along the line */
+  const belt=[];
+  LINES.forEach(c=>{for(const u of [.3,.7]){const sp=sperm(2);sp.userData.c=c;sp.userData.u=u;belt.push(sp);GT.add(sp);}});
+  const beltPlace=s=>{const u=((s.userData.u%1)+1)%1,p=s.userData.c.getPointAt(u),t=s.userData.c.getTangentAt(u);
+    s.position.copy(p).add(new THREE.Vector3(0,.18,0));s.lookAt(p.clone().add(t).add(new THREE.Vector3(0,.18,0)));s.rotateY(Math.PI/2);};
+  belt.forEach(beltPlace);
+  /* the atrium: three decks, one per stage of the build */
+  GT.add(cyl(.12,.12,TRY*1.8,0x7F90A4,0,-TRY*.05,0,14,STEEL));
+  const LV=[-TRY*.62,-TRY*.14,TRY*.34];
+  const FACE=Math.PI/4;
+  const decks=[];
+  LV.forEach((y,i)=>{
+    const r=.95-i*.10;
+    GT.add(new THREE.Mesh(new THREE.CylinderGeometry(r,r,.09,30),mat(0x55637A,DARK)).translateY(y));
+    GT.add(new THREE.Mesh(new THREE.TorusGeometry(r,.028,8,32),mat(0xD9A24A,BRASS)).translateY(y+.20).rotateX(Math.PI/2));
+    for(let k=0;k<10;k++){const a=k/10*Math.PI*2;if(angd(a,FACE)<.55)continue;
+      GT.add(cyl(.018,.018,.20,0x8FA3B8,Math.cos(a)*r,y+.10,Math.sin(a)*r,8,STEEL));}
+    const bx=Math.cos(FACE)*(r-.26),bz=Math.sin(FACE)*(r-.26);
+    GT.add(box(.66,.15,.34,0x8FA3B8,bx,y+.12,bz,STEEL));
+    GT.add(box(.70,.03,.38,0xD9A24A,bx,y+.21,bz,BRASS));
+    const part=sperm(i);part.scale.setScalar(1.9);part.position.set(bx+.05,y+.29,bz);part.rotation.y=Math.PI/4;GT.add(part);
+    const h1=person(Math.cos(FACE+.60)*(r-.34),y+.045,Math.sin(FACE+.60)*(r-.34),{rot:-FACE-.60-Math.PI/2,shirt:SHIRT[i],size:.82,armR:-.9});
+    const h2=person(Math.cos(FACE-.60)*(r-.34),y+.045,Math.sin(FACE-.60)*(r-.34),{rot:-FACE+.60+Math.PI/2,shirt:SHIRT[(i+3)%8],size:.82,armL:.9});
+    people.push(h1,h2);GT.add(h1);GT.add(h2);
+    decks.push({y,r,bx,bz});});
+  /* the props the questions land on */
+  const dk0=decks[0],dk1=decks[1],dk2=decks[2];
+  const inspector=person(Math.cos(FACE+.60)*1.45,dk1.y+.045,Math.sin(FACE+.60)*1.45,{rot:-FACE-.60,shirt:0xC2831F,size:.88,armR:-1.4});
+  inspector.visible=false;GT.add(inspector);
+  const torch=box(.09,.09,.3,0xFFE6B4,Math.cos(FACE+.60)*1.72,dk1.y+.52,Math.sin(FACE+.60)*1.72,{emissive:0xFFC66A,emissiveIntensity:1.6});
+  torch.visible=false;GT.add(torch);
+  const plansTable=box(.80,.07,.52,0x9A7A4E,Math.cos(FACE-1.1)*.52,dk0.y+.30,Math.sin(FACE-1.1)*.52,BRASS);GT.add(plansTable);
+  GT.add(box(.62,.02,.40,0xBBD2E8,Math.cos(FACE-1.1)*.52,dk0.y+.35,Math.sin(FACE-1.1)*.52,{roughness:.5}));
+  const planner=person(Math.cos(FACE-1.5)*.70,dk0.y+.045,Math.sin(FACE-1.5)*.70,{rot:-FACE+1.5,shirt:0x3A5E8C,size:.82,armL:.8});
+  planner.visible=false;GT.add(planner);
+  const scorch=box(.52,.06,.52,0x2A2422,Math.cos(FACE+2.3)*.55,dk0.y+.06,Math.sin(FACE+2.3)*.55,{roughness:.9});
+  scorch.visible=false;GT.add(scorch);
+  const tape=[];for(let i=0;i<2;i++){const t=box(.62,.035,.035,0xD9A24A,Math.cos(FACE+2.3)*.55,dk0.y+.26+i*.22,Math.sin(FACE+2.3)*.55,BRASS);
+    t.rotation.y=-FACE-2.3;t.visible=false;tape.push(t);GT.add(t);}
+  const cordon=box(.62,.80,.62,0xBFC9D4,Math.cos(FACE-2.5)*.52,dk1.y+.46,Math.sin(FACE-2.5)*.52,{transparent:true,opacity:.34,roughness:.2});
+  cordon.visible=false;GT.add(cordon);
+  /* the wall gauge and the hand watching it */
+  const gth=Math.acos(.34),gph=CUTC+2.05,gp2=tsurf(gth,gph,.93);
+  const gauge=new THREE.Group();gauge.position.copy(gp2);gauge.lookAt(gp2.clone().multiplyScalar(2));GT.add(gauge);
+  gauge.add(new THREE.Mesh(new THREE.CylinderGeometry(.30,.30,.07,22),mat(0x33455C,DARK)).rotateX(Math.PI/2));
+  gauge.add(new THREE.Mesh(new THREE.TorusGeometry(.30,.045,8,24),mat(0xD9A24A,BRASS)));
+  const needle=box(.26,.045,.05,0x6ED19A,0,0,.07,{emissive:0x156B3C,emissiveIntensity:1.2});gauge.add(needle);
+  const gdir=Math.atan2(gp2.z,gp2.x);
+  const thermoMan=person(Math.cos(gdir)*(dk2.r-.26),dk2.y+.045,Math.sin(gdir)*(dk2.r-.26),
+    {rot:-gdir,shirt:0xD4A84E,size:.84,armR:-1.5});
+  thermoMan.visible=false;GT.add(thermoMan);
+  /* the intake, at the foot of the unit */
+  /* steam off the relief valves. It appears because the plant is too hot,
+     and it goes away again when it cools \u2014 which is the point.        */
+  const steam=[];
+  for(let i=0;i<14;i++){
+    const p=sph(.15+(i%4)*.05,0xE4EDF6,0,0,0,{transparent:true,opacity:0,roughness:.95,metalness:0,depthWrite:false});
+    p.userData.seed=(i*0.137)%1;p.visible=false;steam.push(p);GT.add(p);}
+  const intake=box(1.0,1.2,.1,0x33455C,Math.cos(FACE-.4)*1.55,-TRY*.80,Math.sin(FACE-.4)*1.55,DARK);GT.add(intake);
+  const intakeCrates=[];for(let i=0;i<3;i++){const c=box(.34,.26,.32,i%2?0xBE8B4E:0xD2AC6C,
+    Math.cos(FACE-.4)*1.15,-TRY*.86+i*.28,Math.sin(FACE-.4)*1.15,{roughness:.7});intakeCrates.push(c);GT.add(c);}
+  const loader=person(Math.cos(FACE-.75)*1.2,-TRY*.95,Math.sin(FACE-.75)*1.2,{rot:-FACE+.75,shirt:0x8E3A33,size:.9,armL:-.9});
+  loader.visible=false;GT.add(loader);
+  /* cradle under the unit, and the vas leaving for the outlet */
+  const cr=new THREE.Mesh(new THREE.TorusGeometry(TRX*.80,.12,10,40),mat(0x6E7E90,STEEL));
+  cr.rotation.x=Math.PI/2;cr.position.y=-TRY*1.02;GT.add(cr);
+  for(const a of [.7,2.3,3.9,5.5])GT.add(cyl(.09,.09,1.5,0x5E6C7E,Math.cos(a)*TRX*.80,-TRY*1.4,Math.sin(a)*TRZ*.80,8,STEEL));
+  const vasPts=[new THREE.Vector3(0,10.2,-.7),new THREE.Vector3(.9,8.4,-1.5),
+                new THREE.Vector3(1.5,5.6,-1.4),new THREE.Vector3(1.25,2.6,-1.1),new THREE.Vector3(.8,1.4,-.4)];
+  const vas=tubeOf(vasPts,.14,0x9FB0C4,STEEL,70);scene.add(vas);
+  const vasC=new THREE.CatmullRomCurve3(vasPts);
+  for(const u of [.2,.5,.8])scene.add(ringAt(vasC.getPointAt(u),vasC.getTangentAt(u),.19,.035,0xD9A24A,BRASS));
+
+  /* ================= BRAIN (floor 2) ================= */
+  const GB=new THREE.Group();GB.position.set(0,15.0,0);scene.add(GB);
+  const BRX=2.45,BRY=1.80,BRZ=2.10;
+  GB.add(shellOf(BRX,BRY,BRZ,0xAEBCCC));
+  const bsurf=surfOf(BRX,BRY,BRZ);
+  for(let g=0;g<11;g++){
+    const base=CUTC+CUTW/2+.14+g*((Math.PI*2-CUTW-.28)/10);
+    const pp=[],keep=[];
+    for(let i=0;i<=70;i++){const t=i/70,th=Math.PI*.10+t*Math.PI*.80,ph=base+Math.sin(t*Math.PI*2.6)*.16;
+      pp.push({p:bsurf(th,ph,1.035),cut:angd(ph,CUTC)<CUTW/2+.04});}
+    let r2=[];for(const q of pp){if(q.cut){if(r2.length>3)keep.push(r2);r2=[];}else r2.push(q.p);}
+    if(r2.length>3)keep.push(r2);
+    keep.forEach(r=>{GB.add(tubeOf(r,.066,0x9FB0C4,STEEL,70));
+      const c=new THREE.CatmullRomCurve3(r);
+      for(const u of [0,1]){const p=c.getPointAt(u);
+        const cap=new THREE.Mesh(new THREE.CircleGeometry(.067,12),mat(0xD9A24A,Object.assign({side:THREE.DoubleSide},BRASS)));
+        cap.position.copy(p);cap.lookAt(p.clone().add(c.getTangentAt(u)));GB.add(cap);}});}
+  for(const f of [-.5,-.1,.35]){const th=Math.acos(f);
+    for(let i=0;i<=18;i++){const ph=CUTC+CUTW/2+(Math.PI*2-CUTW)*i/18;GB.add(sph(.033,0xD3DEEA,...bsurf(th,ph,1.01).toArray(),STEEL));}}
+  /* the board room */
+  const BDY=-BRY*.44;
+  GB.add(new THREE.Mesh(new THREE.CylinderGeometry(1.48,1.48,.1,34),mat(0x55637A,DARK)).translateY(BDY));
+  GB.add(new THREE.Mesh(new THREE.TorusGeometry(1.48,.028,8,34),mat(0xD9A24A,BRASS)).translateY(BDY+.20).rotateX(Math.PI/2));
+  for(let k=0;k<12;k++){const a=k/12*Math.PI*2;if(angd(a,FACE)<.6)continue;
+    GB.add(cyl(.018,.018,.20,0x8FA3B8,Math.cos(a)*1.48,BDY+.10,Math.sin(a)*1.48,8,STEEL));}
+  const tbl=new THREE.Mesh(new THREE.CylinderGeometry(.70,.70,.09,30),mat(0x9A7A4E,BRASS));
+  tbl.position.y=BDY+.56;tbl.scale.z=.76;GB.add(tbl);
+  GB.add(cyl(.15,.23,.50,0x7F90A4,0,BDY+.30,0,14,STEEL));
+  const board=[];
+  for(let k=0;k<6;k++){const a=k/6*Math.PI*2+.32;
+    const d=person(Math.cos(a)*.98,BDY+.05,Math.sin(a)*.78,{rot:-a+Math.PI/2,shirt:SHIRT[k],size:.84});
+    board.push(d);GB.add(d);}
+  /* the order board, lit */
+  const bp2=bsurf(Math.PI*.46,CUTC+Math.PI,.90);
+  const bd=box(1.3,.78,.09,0x33455C,bp2.x,bp2.y,bp2.z,DARK);bd.lookAt(0,bp2.y,0);GB.add(bd);
+  const slips=[];
+  for(let i=0;i<3;i++){const s=box(1.0,.12,.05,0xD9A24A,bp2.x,bp2.y+.22-i*.22,bp2.z,
+    {emissive:0x8A5A12,emissiveIntensity:1.1,metalness:.5,roughness:.4});
+    s.lookAt(0,bp2.y,0);s.translateZ(.08);slips.push(s);GB.add(s);}
+  /* the lamp over the table */
+  GB.add(cyl(.045,.045,.62,0x8FA3B8,0,BDY+1.32,0,10,STEEL));
+  GB.add(new THREE.Mesh(new THREE.ConeGeometry(.30,.26,20,1,true),mat(0x8FA3B8,Object.assign({side:THREE.DoubleSide},STEEL))).translateY(BDY+1.0));
+  const lamp=sph(.13,0xFFE6B4,0,BDY+.92,0,{emissive:0xFFC66A,emissiveIntensity:2.0});GB.add(lamp);
+  const lampL=new THREE.PointLight(0xFFD08A,2.4,7.5);lampL.position.set(0,15.0+BDY+.92,0);scene.add(lampL);
+  /* archive, stores, and the crate nobody ordered */
+  const clerks=[],papers=[];
+  for(let i=0;i<4;i++)GB.add(box(.34,.72,.3,0x5E7795,Math.cos(FACE+2.2)*1.15+i*.17,BDY+.41,Math.sin(FACE+2.2)*1.15-i*.17,STEEL));
+  for(let i=0;i<2;i++){const c=person(Math.cos(FACE+2.2)*.80-i*.3,BDY+.05,Math.sin(FACE+2.2)*.80+i*.3,
+    {rot:-FACE-2.2,shirt:SHIRT[i+2],size:.84,armL:-.9});c.visible=false;clerks.push(c);GB.add(c);}
+  for(let i=0;i<8;i++){const p=box(.15,.012,.11,0xF4ECDC,Math.cos(FACE+2.2)*1.0+(rnd()-.5)*.5,BDY+.6+rnd()*.7,Math.sin(FACE+2.2)*1.0+(rnd()-.5)*.5,{roughness:.7});
+    p.rotation.set(rnd()*2,rnd()*3,rnd()*2);p.visible=false;papers.push(p);GB.add(p);}
+  const shelf=new THREE.Group();shelf.position.set(Math.cos(FACE-1.6)*1.2,BDY,Math.sin(FACE-1.6)*1.2);shelf.rotation.y=-FACE+1.6;
+  for(let i=0;i<3;i++){shelf.add(box(1.0,.055,.34,0x9A7A4E,0,.14+i*.34,0,BRASS));
+    for(let j=0;j<4;j++)shelf.add(box(.16,.2,.16,[0xC2831F,0xA8382A,0x2F6246,0xD4A84E][j],-.36+j*.24,.26+i*.34,0,{roughness:.6}));}
+  GB.add(shelf);
+  const storeman=person(Math.cos(FACE-1.6)*.80,BDY+.05,Math.sin(FACE-1.6)*.80,{rot:-FACE+1.6,shirt:0x6A5742,size:.86,armR:-1.0});
+  storeman.visible=false;GB.add(storeman);
+  const crate=new THREE.Group();
+  crate.add(box(.56,.42,.46,0x7A5436,0,.21,0,{roughness:.7}));
+  crate.add(box(.5,.08,.04,0xC8553D,0,.3,.24,{emissive:0x6B2016,emissiveIntensity:1}));
+  crate.position.set(Math.cos(FACE)*1.0,BDY+.05,Math.sin(FACE)*1.0);crate.visible=false;GB.add(crate);
+  const courier=person(Math.cos(FACE)*1.42,BDY+.05,Math.sin(FACE)*1.42,{rot:-FACE+Math.PI,shirt:0x8E3A33,size:.9});
+  courier.visible=false;GB.add(courier);
+  /* the pituitary: the pod that actually sends the order */
+  GB.add(cyl(.14,.14,.56,0x8FA3B8,0,-BRY*1.02,0,14,STEEL));
+  for(const y of [-BRY*.88,-BRY*1.16])GB.add(new THREE.Mesh(new THREE.TorusGeometry(.19,.034,8,18),mat(0xD9A24A,BRASS)).translateY(y).rotateX(Math.PI/2));
+  const pod=sph(.44,0xBFCBD8,0,-BRY*1.45,0,STEEL);pod.scale.set(1,.82,.92);GB.add(pod);
+  GB.add(sph(.10,0x8FE3B4,.26,-BRY*1.40,.28,{emissive:0x1E7A4A,emissiveIntensity:1.8}));
+  const ducts=[];
+  [[-1,0x7C8EA3],[1,0xD9A24A]].forEach(([s,c],i)=>{
+    const pts=[new THREE.Vector3(s*.28,-BRY*1.66,.08),new THREE.Vector3(s*.80,-2.95,.22),new THREE.Vector3(s*.95,-4.55,.15)];
+    GB.add(tubeOf(pts,.095,c,i?BRASS:STEEL,50));ducts.push(new THREE.CatmullRomCurve3(pts));});
+  /* the order itself, running down the stalk */
+  const memo=sph(.10,0xD9A24A,0,0,0,{emissive:0xD9A24A,emissiveIntensity:1.6});GB.add(memo);
+
+  /* crowd on the outlet deck */
+  for(let i=0;i<3;i++){const p=person(1.5+rnd()*3.4,.17,-2.6+rnd()*1.2,{size:.9});people.push(p);GO.add(p);}
+
+
+  /* ================= THE ROOM (where he actually is) =================
+     He is on his own sofa, at night, laptop open on his lap and the
+     phone this is running on in his pocket. Everything else in the
+     app is inside him; this is the one place that is outside.        */
+  const GR=new THREE.Group();GR.position.set(0,-40,0);scene.add(GR);
+  const rLampL=new THREE.PointLight(0xFFC98A,8.5,11.0);
+  const rScreenL=new THREE.PointLight(0xBFD8FF,2.2,2.6);
+  const rWarmL=new THREE.PointLight(0xFFB877,2.2,9.0);rWarmL.position.set(-2.6,1.9,-1.6);
+  GR.add(rLampL);GR.add(rScreenL);GR.add(rWarmL);
+  const seat=new THREE.Group();seat.rotation.y=0.78;GR.add(seat);
+  const RM=(c,o)=>mat(c,Object.assign({roughness:.86,metalness:.03,envMapIntensity:.06},o||{}));
+  const rbox=(w,h,d,c,x,y,z,o)=>{const m=new THREE.Mesh(bg(w,h,d),RM(c,o));m.position.set(x,y,z);m.castShadow=1;m.receiveShadow=1;return m;};
+  const rcyl=(a,b,h,c,x,y,z,n,o)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(a,b,h,n||14),RM(c,o));m.position.set(x,y,z);m.castShadow=1;m.receiveShadow=1;return m;};
+  const rsph=(r,c,x,y,z,o)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,18,14),RM(c,o));m.position.set(x,y,z);m.castShadow=1;m.receiveShadow=1;return m;};
+  /* shell of the room */
+  GR.add(rbox(12,.2,12,0x2A3242,0,-.1,0));
+  GR.add(rbox(9,3.4,.24,0x1D2634,0,1.7,-2.75));
+  GR.add(rbox(.24,3.4,8,0x1D2634,-3.6,1.7,0));
+  GR.add(rbox(4.6,.035,3.4,0x3A4357,.1,.02,.55));
+  GR.add(rbox(4.2,.012,3.0,0x455066,.1,.042,.55));
+  GR.add(rbox(9,.14,.07,0x2E3848,0,.07,-2.6));
+  GR.add(rbox(.07,.14,8,0x2E3848,-3.45,.07,0));
+  GR.add(rbox(1.9,1.35,.09,0x151E2B,-1.0,1.62,-2.66));
+  GR.add(rbox(2.05,1.5,.06,0x33415A,-1.0,1.62,-2.70));
+  /* sofa */
+  seat.add(rbox(2.75,.44,1.15,0x6B5F52,.1,.30,.15));
+  seat.add(rbox(2.75,.86,.26,0x6B5F52,.1,.78,-.33));
+  for(const x of [-1.24,1.44])seat.add(rbox(.28,.62,1.15,0x7B6E5F,x,.47,.15));
+  for(const x of [-.5,.72])seat.add(rbox(1.12,.16,.92,0x7B6E5F,x,.58,.2));
+  for(const [x,z] of [[-1.15,-.3],[1.35,-.3],[-1.15,.6],[1.35,.6]])seat.add(rcyl(.06,.05,.2,0x3B3027,x,.1,z,10));
+  seat.add(rbox(.42,.14,.38,0xA8382A,-.85,.74,-.12));
+  /* side table and the lamp that carries the room */
+  seat.add(rbox(.62,.06,.56,0x5A4A3A,-1.95,.52,-.25));
+  for(const [x,z] of [[-2.19,-.45],[-1.71,-.45],[-2.19,-.05],[-1.71,-.05]])seat.add(rcyl(.028,.028,.52,0x4A3C2F,x,.26,z,8));
+  seat.add(rcyl(.11,.14,.05,0x8A7A5E,-1.72,.57,-.25));
+  seat.add(rcyl(.022,.022,.5,0x8A7A5E,-1.72,.82,-.25,8));
+  const rshade=new THREE.Mesh(new THREE.ConeGeometry(.24,.3,20,1,true),
+    RM(0xE8CFA2,{side:THREE.DoubleSide,emissive:0x6B4F22,emissiveIntensity:.5}));
+  rshade.position.set(-1.72,1.2,-.25);seat.add(rshade);
+  seat.add(rsph(.09,0xFFE6B4,-1.72,1.12,-.25,{emissive:0xFFC66A,emissiveIntensity:2.4}));
+  rLampL.position.set(-1.72,1.26,-.25);
+  seat.add(rcyl(.055,.045,.09,0xD8D2C4,-2.05,.6,-.1));
+  /* a plant, and a mug on the floor */
+  GR.add(rcyl(.17,.13,.26,0x8A6A4E,2.2,.13,-1.1,16));
+  for(let i=0;i<7;i++){const a=i/7*Math.PI*2;
+    const l=rbox(.05,.46,.14,0x3E6B4E,2.2+Math.cos(a)*.1,.45+((i%3)*.07),-1.1+Math.sin(a)*.1);
+    l.rotation.set(Math.cos(a)*.5,a,Math.sin(a)*.5);GR.add(l);}
+  GR.add(rcyl(.06,.05,.1,0xD8D2C4,1.25,.05,1.0));
+  /* the man */
+  const SKIN2=0xE0C09A,SHIRT2=0x3A5E8C,TRS=0x2E3A48,HAIR2=0x241C16;
+  const rman=new THREE.Group();rman.position.set(.34,0,0);seat.add(rman);
+  for(const sg of [-1,1]){
+    rman.add(rbox(.19,.19,.62,TRS,sg*.14,.60,.36));
+    rman.add(rbox(.17,.52,.17,TRS,sg*.14,.33,.64));
+    rman.add(rbox(.19,.09,.30,0x1A2330,sg*.14,.07,.73));}
+  rman.add(rbox(.50,.56,.30,SHIRT2,0,.94,.04));
+  rman.add(rbox(.46,.14,.31,SHIRT2,0,.66,.06));
+  for(const sg of [-1,1]){
+    const up=rbox(.14,.34,.15,SHIRT2,sg*.31,1.00,.08);up.rotation.x=.5;rman.add(up);
+    rman.add(rbox(.13,.13,.34,SHIRT2,sg*.30,.84,.33));
+    rman.add(rsph(.065,SKIN2,sg*.26,.80,.50));}
+  rman.add(rcyl(.09,.10,.11,SKIN2,0,1.26,.02,12));
+  const rhead=rsph(.258,SKIN2,0,1.47,.01);rman.add(rhead);
+  const rhair=rsph(.268,HAIR2,0,1.525,-.005);rhair.scale.set(1,.70,1);rman.add(rhair);
+  rman.add(rsph(.05,SKIN2,-.228,1.44,0));rman.add(rsph(.05,SKIN2,.228,1.44,0));
+  const rbeard=rsph(.232,0x2E2219,0,1.405,.055);rbeard.scale.set(1,.58,.80);rman.add(rbeard);
+  /* the laptop, open on his lap */
+  const lap=new THREE.Group();lap.position.set(0,.76,.40);lap.rotation.y=-0.24;rman.add(lap);
+  lap.add(rbox(.70,.035,.48,0x9BA6B4,0,0,0,{metalness:.55,roughness:.35}));
+  lap.add(rbox(.60,.004,.30,0x4B5564,0,.021,.04));
+  const scr=new THREE.Group();scr.position.set(0,.015,-.24);scr.rotation.x=-1.46;lap.add(scr);
+  scr.add(rbox(.68,.46,.026,0x9BA6B4,0,.23,0,{metalness:.55,roughness:.35}));
+  scr.add(rbox(.60,.38,.012,0xCFE4FF,0,.23,.019,{emissive:0xAECCF2,emissiveIntensity:2.1}));
+  rScreenL.position.set(.30,1.12,.30);
+  /* the phone, in his pocket: the device this is running on */
+  const ph=new THREE.Group();ph.position.set(.335,.665,.515);ph.rotation.set(.26,-.34,-.12);rman.add(ph);
+  ph.add(rbox(.165,.285,.032,0x0D1118,0,0,0,{metalness:.4,roughness:.35}));
+  ph.add(rbox(.138,.252,.012,0x3E5E8A,0,.014,.020,{emissive:0x6EA0DE,emissiveIntensity:1.9}));
+  rman.add(rbox(.26,.014,.20,0x242E3C,.33,.715,.47));
+  const phW=new THREE.Vector3(),manW=new THREE.Vector3(),lampW=new THREE.Vector3();
+  GR.updateWorldMatrix(true,true);
+  ph.getWorldPosition(phW);rman.getWorldPosition(manW);rshade.getWorldPosition(lampW);
+  const MOOD={room:{h:.16,k:.20,e:.60,bg:0x0B121B},plant:{h:.46,k:1.02,e:.95,bg:0x101A26}};
+  function mood(m){const d=MOOD[m];hemi.intensity=d.h;key.intensity=d.k;
+    rn.toneMappingExposure=d.e;scene.background.setHex(d.bg);
+    rLampL.visible=rScreenL.visible=rWarmL.visible=(m==='room');}
+
+  /* --------------------------------------------------------- floors */
+  function showFloor(i){GR.visible=false;GO.visible=true;GT.visible=i>=1;vas.visible=i>=1;GB.visible=i>=2;lampL.visible=i>=2;}
+  function showRoom(){GR.visible=true;GO.visible=GT.visible=GB.visible=vas.visible=lampL.visible=false;}
+  const prop=(o,on)=>{o.visible=on;};
+
+  /* ================= WHAT THE PLANT DOES WHEN HE TELLS IT SOMETHING ====
+     It does not panic. It notices. A tag goes up at that station, the
+     nearest hand looks over, and the severity decides how much else
+     stops. Panic would punish him for being honest.                   */
+  const TAGC={note:0xD9A24A,flag:0xE08A3C,stop:0xC8553D};
+  const marks=new Map();
+  let dipT=0,shakeT=0,shakeX=0,shakeY=0;
+  function makeTag(){
+    const g=new THREE.Group();
+    g.add(cyl(.032,.032,.46,0x55637A,0,.23,0,8,{metalness:.5,roughness:.5}));
+    g.add(box(.42,.26,.03,0x1B2430,0,.55,-.025,{roughness:.8,metalness:.2}));
+    const plate=box(.36,.21,.05,0xD9A24A,0,.55,.01,{emissive:0xC98A2E,emissiveIntensity:2.2,metalness:.4,roughness:.35});
+    const bead=sph(.085,0xD9A24A,0,.80,0,{emissive:0xD9A24A,emissiveIntensity:2.6});
+    g.add(plate);g.add(bead);
+    g.traverse(m=>{m.castShadow=false});
+    g.userData.plate=plate;g.userData.bead=bead;
+    return g;}
+  function markAt(x,y,z,tier,key){
+    const prev=marks.get(key);
+    if(prev){prev.parent&&prev.parent.remove(prev);marks.delete(key);}
+    if(!tier)return;
+    const host = y>12?GB : (y>4?GT:GO);
+    const g=makeTag();
+    const p=new THREE.Vector3(x,y,z);host.updateWorldMatrix(true,false);host.worldToLocal(p);
+    g.position.copy(p);g.position.x+=.42;g.position.z+=.42;g.position.y+=.22;
+    host.add(g);marks.set(key,g);
+    const c=TAGC[tier];
+    g.userData.plate.material.color.setHex(c);
+    g.userData.plate.material.emissive.setHex(tier==='stop'?0x6B2016:0x8A5A12);
+    g.userData.bead.material.color.setHex(c);
+    g.userData.bead.material.emissive.setHex(c);
+    g.userData.tier=tier;
+    /* the nearest hand looks over */
+    const w=new THREE.Vector3(x,y,z);let best=null,bd=9;
+    people.forEach(pp=>{if(!pp.visible)return;const v=new THREE.Vector3();pp.getWorldPosition(v);
+      const d=v.distanceTo(w);if(d<bd){bd=d;best=pp;}});
+    if(best&&bd<3.2){const v=new THREE.Vector3();best.getWorldPosition(v);
+      best.userData.turn=Math.atan2(w.x-v.x,w.z-v.z);}
+    /* and the plant reacts in proportion */
+    if(tier==='flag'){dipT=Math.max(dipT,.45);beltRate=Math.min(beltRate,.30);}
+    if(tier==='stop'){dipT=1;shakeT=1;beltRate=0;}
+  }
+
+  /* --------------------------------------------------- camera + loop */
+  const ISO=new THREE.Vector3(15,12,15);
+  const cam=new THREE.OrthographicCamera(-1,1,1,-1,-220,400);
+  const tgt=new THREE.Vector3(0,8,0),cur=new THREE.Vector3(0,8,0);
+  let tD=10.5,cD=10.5,hot=false,t0=0;
+  let beltRate=1,fanRate=1,memoRate=1,memoU=0,actNow='',officeShut=false,carrU=.04,carrTo=.04,heatV=0;
+  function frame(){const a=innerWidth/innerHeight;
+    cam.left=-cD*a;cam.right=cD*a;cam.top=cD;cam.bottom=-cD;cam.updateProjectionMatrix();
+    cam.position.copy(cur).add(ISO);
+    cam.position.x+=shakeX;cam.position.y+=shakeY;
+    cam.lookAt(cur.x+shakeX,cur.y+shakeY,cur.z);}
+  function resize(){rn.setSize(innerWidth,innerHeight);frame();}
+  addEventListener('resize',resize);resize();
+  const needleBase=needle.rotation.z;
+  function loop(ms){requestAnimationFrame(loop);const t=ms/1000,dt=Math.min(.05,t-t0);t0=t;
+    if(shakeT>0){shakeT=Math.max(0,shakeT-dt*1.5);
+      /* Someone who gets motion sick did not consent to being shaken.
+         The lighting dip still tells him the line stopped.            */
+      if(RMQ.matches){shakeX=0;shakeY=0;}
+      else{shakeX=Math.sin(t*41)*shakeT*.20;shakeY=Math.cos(t*53)*shakeT*.15;}}
+    else if(shakeX||shakeY){shakeX=0;shakeY=0;}
+    cur.lerp(tgt,Math.min(1,dt*3.0));cD+=(tD-cD)*Math.min(1,dt*3.0);frame();
+    belt.forEach((s,i)=>{s.userData.u+=dt*.055*beltRate;beltPlace(s);
+      s.userData.tail.forEach((sg,j)=>{sg.position.z=Math.sin(t*6*beltRate+i*1.3-j*.8)*(.010+j*.010);});});
+    fans.forEach(f=>f.rotation.z+=dt*3.4*fanRate);
+    memoU+=dt*.22*memoRate;if(memoU>1)memoU=0;
+    {const c=ducts[memoU<.5?0:1],u=(memoU%.5)*2,p=c.getPointAt(u);memo.position.copy(p);}
+    if(actNow==='lamp'&&!officeShut){const fl=.5+.5*Math.max(0,Math.sin(t*17.3)*Math.sin(t*5.9)+.3);
+      lamp.material.emissiveIntensity=2.0*fl;lampL.intensity=2.4*fl;}
+    if(actNow==='store'&&storeman.visible){storeman.userData.aR.rotation.z=-1.0+Math.sin(t*1.9)*.38;}
+    if(actNow==='archive'){papers.forEach((pp,i)=>{pp.position.y=(-BRY*.44)+.5+((t*.42+i*.29)%1.0);pp.rotation.y+=dt*1.5;});
+      clerks.forEach((c,i)=>{c.userData.aL.rotation.z=-(.65+Math.sin(t*2.2+i)*.5);});}
+    if(actNow==='intake'&&loader.visible){loader.userData.aL.rotation.z=-.9+Math.sin(t*1.5)*.4;
+      intakeCrates.forEach((c,i)=>c.position.y=-TRY*.86+i*.28+Math.sin(t*1.2+i*1.3)*.05);}
+    if(thermoMan.visible)thermoMan.userData.aR.rotation.z=-1.5+Math.sin(t*2)*.12;
+    if(inspector.visible){inspector.userData.aR.rotation.z=-1.4+Math.sin(t*1.6)*.18;}
+    if(heatV>.02){steam.forEach(p=>{
+      const u=((t*.30+p.userData.seed)%1), a=p.userData.seed*Math.PI*2+u*.7;
+      const r=TRX*(.55+.52*u);
+      p.position.set(Math.cos(a)*r,-TRY*.25+u*TRY*2.1,Math.sin(a)*r);
+      p.scale.setScalar(.5+u*1.9);
+      p.material.opacity=heatV*.70*Math.sin(Math.PI*u);
+      p.visible=true;});}
+    else if(steam[0].visible)steam.forEach(p=>{p.visible=false;});
+    if(dipT>0&&heatV<.02){dipT=Math.max(0,dipT-dt*.55);
+      hemi.intensity=.46*(1-dipT*.78);key.intensity=1.02*(1-dipT*.72);
+      rn.toneMappingExposure=.95-dipT*.52;}
+    marks.forEach(g=>{if(g.userData.tier==='stop'){
+      const f=1.3+Math.sin(t*11)*1.3;
+      g.userData.bead.material.emissiveIntensity=f;
+      g.userData.plate.material.emissiveIntensity=1.2+Math.sin(t*11)*.9;}});
+    people.forEach(p=>{if(p.userData.turn!==undefined){
+      let d=p.userData.turn-p.rotation.y;
+      while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+      p.rotation.y+=d*Math.min(1,dt*4);}});
+    swarm.forEach((sp,i)=>sp.userData.tail.forEach((sg,j)=>{
+      sg.position.z=Math.sin(t*7+i*1.5-j*.8)*(.013+j*.013);}));
+    carrU+=(carrTo-carrU)*Math.min(1,dt*1.1);carrierAt(carrU);
+    rn.render(scene,cam);}
+  requestAnimationFrame(loop);
+
+  /* Every visual below follows an answer he gave, never a gesture. */
+  function applyState(){
+    fanRate = hot?3.8:1;
+    beltRate = officeShut?.06 : (hot?.25:1);
+    memoRate = officeShut?0:1;
+    heatV = hot?1:0;
+    needle.rotation.z=needleBase+(hot?.9:0);
+    needle.material.color.setHex(hot?0xE87D6A:0x6ED19A);
+    needle.material.emissive.setHex(hot?0x8A2A1C:0x156B3C);
+    shellMat.emissive.setHex(0x8A2A10);shellMat.emissiveIntensity=hot?.80:0;
+    tubeMeshes.forEach(m=>{m.material.emissive.setHex(0xB04418);m.material.emissiveIntensity=hot?1:0;});
+    if(!hot)steam.forEach(p=>{p.visible=false;});
+    hemi.color.setHex(hot?0xC98A62:0x8AA2C0);
+    scene.background.setHex(hot?0x2A1912:0x101A26);
+  }
+
+  const ACT={
+    crate(){prop(crate,true);prop(courier,true);},
+    lamp(){},
+    archive(){papers.forEach(x=>prop(x,true));clerks.forEach(c=>prop(c,true));},
+    store(){prop(storeman,true);},
+    inspect(){prop(inspector,true);prop(torch,true);},
+    plans(){prop(planner,true);},
+    scorch(){prop(scorch,true);tape.forEach(x=>prop(x,true));},
+    cordon(){prop(cordon,true);},
+    thermo(){prop(thermoMan,true);},
+    intake(){prop(loader,true);},
+    barrier(){prop(barrier,true);prop(driver,true);carrTo=.64;},
+    flood(){prop(flood,true);prop(barrier,false);carrTo=.34;},
+    shutter(){shutter.position.y=1.5;carrTo=.04;},
+    gates(){prop(gateB,true);prop(barrier,false);prop(flood,false);carrTo=.93;
+      gateA.material.color.setHex(0xE87D6A);gateA.material.emissive.setHex(0x8A2A1C);},
+    schedule(){}
+  };
+
+  SC={
+    look(x,y,z,d,fl){showFloor(fl===undefined?9:fl);tD=d;tgt.set(x,y-d*0.40,z);},
+    aim(x,y,z,d,fl,sy){showFloor(fl===undefined?9:fl);tD=d;
+      const L=d*Math.max(0.1,Math.min(1.15,(0.5-sy)/0.41));tgt.set(x,y-L,z);},
+    act(n){actNow=n||'';if(ACT[n])ACT[n]();},
+    mark(x,y,z,tier,key){markAt(x,y,z,tier,key);},
+    clearMarks(){marks.forEach(g=>g.parent&&g.parent.remove(g));marks.clear();
+      people.forEach(p=>{delete p.userData.turn;});dipT=0;shakeT=0;},
+    clearInter(){applyState();
+      if(dipT<=0){hemi.intensity=.46;key.intensity=1.02;rn.toneMappingExposure=.95;}},
+    populate(on){people.forEach(m=>prop(m,on));board.forEach(m=>prop(m,on));},
+    setHot(v){hot=v;applyState();},
+    shutOffice(v){officeShut=v;lamp.material.emissiveIntensity=v?0:2.0;lampL.intensity=v?0:2.4;
+      slips.forEach(s=>{s.material.color.setHex(v?0x33455C:0xD9A24A);s.material.emissiveIntensity=v?0:.95;});
+      memo.visible=!v;applyState();if(v)dipT=Math.max(dipT,.45);},
+    setBarrier(v){prop(barrier,v);if(v&&carrTo>.64)carrTo=.64;},
+    dim(v){hemi.intensity=v?.14:.46;key.intensity=v?.30:1.02;rn.toneMappingExposure=v?.56:.95;
+      scene.background.setHex(v?0x0A1017:0x101A26);},
+    cam(){return cam;},
+    dbg(){const g=o=>({p:o.position.toArray().map(n=>+n.toFixed(2)),vis:o.visible});
+      return {needle:g(needle),gaugeMan:g(thermoMan),lorry:g(carrier),barrier:g(barrier),
+              tgt:tgt.toArray().map(n=>+n.toFixed(2)),d:+tD.toFixed(2)};},
+    probe(x,y,z){const v=new THREE.Vector3(x,y,z).project(cam);return {sx:(v.x+1)/2, sy:(1-v.y)/2};},
+    wide(){showFloor(9);mood('plant');tD=10.5;tgt.set(1.0,8.2,0);},
+    roomWide(){showRoom();mood('room');tD=2.62;
+      tgt.set(manW.x*.66+lampW.x*.34,-40+.92,manW.z*.66+lampW.z*.34);cur.copy(tgt);cD=tD;},
+    roomPush(){tD=.52;tgt.set(phW.x,phW.y+.02,phW.z);},
+    toTower(){showFloor(9);mood('plant');tD=10.5;tgt.set(1.0,8.2,0);cur.copy(tgt);cD=tD;},
+    memoDrop(){showFloor(2);tD=3.2;tgt.set(0,12.2-3.2*0.40,0);},
+    loadUp(){showFloor(1);tD=3.4;tgt.set(1.2,3.6-3.4*0.40,-1.2);prop(driver,true);carrTo=.04;}
+  };
+  SC.populate(true);SC.roomWide();
+  return SC;
+}
+
+/* ============================= APP ============================= */
+const ui=document.getElementById('ui');
+const A={ctx:{},flags:{},qi:0,sel:new Set(),express:false,answers:{}};
+const RMQ=matchMedia('(prefers-reduced-motion: reduce)');
+const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!==undefined)n.textContent=x;return n;};
+function bar(label,si,onBack){PENDBACK=onBack||null;const b=el('div','topbar');
+  if(onBack){const k=el('button','backb','\u2039 Back');k.onclick=onBack;b.appendChild(k);}
+  b.appendChild(el('span',null,label));
+  if(si!==undefined){const d=el('span','dots');for(let j=0;j<3;j++){const s=el('i');if(j<=si)s.className='on';d.appendChild(s);}b.appendChild(d);}
+  const r=el('button','restb'+(si===undefined?' solo':''),'Restart');
+  r.onclick=askRestart;b.appendChild(r);
+  return b;}
+/* Wiping his answers is one tap, so it asks first — he has already lost
+   a whole screen to a stray tap once.                                    */
+function askRestart(){
+  if(document.querySelector('.modal'))return;
+  const m=el('div','modal'),c=el('div','card');
+  c.appendChild(el('h3',null,'Start the screening over?'));
+  c.appendChild(el('p',null,'Everything you have told us so far is cleared. Nothing has been sent anywhere, and nothing is kept.'));
+  const yes=el('button','btn','Clear it and start again');
+  yes.onclick=()=>{m.remove();restartAll();};
+  const no=el('button','ghost','Keep my answers');
+  no.onclick=()=>m.remove();
+  c.appendChild(yes);c.appendChild(no);m.appendChild(c);
+  m.onclick=e=>{if(e.target===m)m.remove();};
+  document.body.appendChild(m);
+}
+function restartAll(){
+  A.flags={};A.ctx={};A.qi=0;A.sel=new Set();A.answers={};A.express=false;
+  try{sessionStorage.removeItem(SKEY);}catch(e){}
+  if(SC){SC.setHot(false);SC.shutOffice(false);SC.setBarrier(false);SC.clearMarks();}
+  screenIntro();
+}
+let BACKFN=null,PENDBACK=null;
+const wrap=cs=>{BACKFN=PENDBACK;PENDBACK=null;ui.textContent='';cs.forEach(c=>ui.appendChild(c));};
+const SKEY='fert.screen.v1';
+function save(){try{sessionStorage.setItem(SKEY,JSON.stringify({qi:A.qi,ctx:A.ctx,
+  express:A.express,answers:Object.fromEntries(Object.entries(A.answers)
+    .map(([k,v])=>[k,[...v]]))}));}catch(e){}}
+function saved(){try{const r=sessionStorage.getItem(SKEY);if(!r)return null;
+  const d=JSON.parse(r);return (d&&d.answers&&Object.keys(d.answers).length)?d:null;}
+  catch(e){return null;}}
+function resume(d){A.ctx=d.ctx||{};A.express=!!d.express;A.qi=d.qi||0;A.answers={};
+  Object.entries(d.answers).forEach(([k,v])=>{A.answers[k]=new Set(v);});
+  recompute();if(A.qi>=Q.length)A.qi=Q.length-1;screenQ();}
+/* The phone's own back gesture used to close the app and take every answer
+   with it. Keep one spare entry on the stack so it can never leave.      */
+history.replaceState({app:0},'');history.pushState({app:1},'');
+addEventListener('popstate',()=>{history.pushState({app:1},'');if(BACKFN)BACKFN();});
+/* floor index is the inverse of the section: office is the top floor */
+const look=(f,s)=>{SC&&SC.look(f[0],f[1],f[2],f[3],s===undefined?9:2-s);};
+
+function screenIntro(){
+  SC&&SC.roomWide();
+  const h=el('div','hero fade');
+  h.appendChild(el('h1','h1','You would not feel a thing.'));
+  h.appendChild(el('p','lede','A man can have a serious problem with his fertility and feel completely well. No ache, no sign, nothing to notice \u2014 which is why so few men ever find out.'));
+  const b=el('button','btn amb','Show me mine');b.onclick=screenEnter;
+  h.appendChild(b);
+  const sv=saved();
+  if(sv){const c=el('button','btn','Pick up where I left off');
+    c.onclick=()=>resume(sv);h.appendChild(c);}
+  const sk=el('button','ghost','I already know I want the test');
+  sk.onclick=()=>{A.express=true;screenArrange();};h.appendChild(sk);
+  h.appendChild(el('p','note','Thirteen questions, about three minutes. No name, no account \u2014 the screening never leaves this phone.'));
+  wrap([el('div','topbar'),el('div','spacer'),h]);
+}
+/* push in on the phone in his pocket, cut, and we are inside him */
+const CRAWL=[
+ ['Inside every man there is a plant.','It has been running since he was fifteen.'],
+ ['It builds a new batch every seventy-four days.','None of us has ever seen one.'],
+ ['She has had the scans, the bloods, the waiting rooms.','You have had none.'],
+ ['Not because anyone decided you were fine.','Because nobody asked.']
+];
+/* push into the phone, go dark, tell him what is in there, then turn the
+   lights on. Tap anywhere, at any point, and it all goes away.          */
+/* The crawl moves when he moves it. A tap is "next", never "skip" \u2014
+   an accidental tap used to throw the whole thing away. Skip is its own
+   button, in the corner, where it has to be meant.                      */
+function screenEnter(){
+  const cr=document.getElementById('crawl'), ct=document.getElementById('crawlText');
+  const dots=document.getElementById('crawlDots'), hint=document.getElementById('crawlHint');
+  const skip=document.getElementById('crawlSkip'), stage=document.getElementById('stage');
+  let step=0, open=false, ended=false;
+  dots.innerHTML='';CRAWL.forEach(()=>dots.appendChild(document.createElement('i')));
+  const paint=()=>{
+    ct.style.opacity='0';
+    setTimeout(()=>{const b=CRAWL[step];
+      ct.innerHTML='<b>'+b[0]+'</b><span>'+b[1]+'</span>';ct.style.opacity='1';},300);
+    [...dots.children].forEach((d,k)=>{d.className=k<=step?'on':'';});
+    hint.style.opacity=step===0?'1':'0';
+  };
+  const reveal=()=>{if(open)return;open=true;cr.classList.add('on');paint();};
+  const finish=()=>{
+    if(ended)return;ended=true;
+    cr.classList.remove('on');ct.style.opacity='0';
+    cr.onclick=null;skip.onclick=null;stage.onclick=null;
+    if(SC)SC.toTower();
+    setTimeout(()=>{
+      const h=el('div','hero fade');
+      h.appendChild(el('h1','h1','This is yours.'));
+      h.appendChild(el('p','lede','It has never once been inspected.'));
+      const b=el('button','btn amb','Begin the inspection');b.onclick=()=>screenSection(0);
+      h.appendChild(b);
+      wrap([el('div','topbar'),el('div','spacer'),h]);
+    },280);
+  };
+  const next=()=>{
+    if(ended)return;
+    if(!open){reveal();return;}
+    if(step<CRAWL.length-1){step++;paint();} else finish();
+  };
+  wrap([el('div','topbar')]);
+  SC&&SC.roomPush();
+  /* the camera move is the only thing on a timer, and a tap cuts it short */
+  setTimeout(reveal,1100);
+  stage.onclick=next;
+  cr.onclick=next;
+  skip.onclick=(e)=>{e.stopPropagation();finish();};
+}
+function screenCtx(i){
+  const c=CONTEXT[i];SC&&SC.look(0,14.60,0,3.2,2);
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','Before the board decides · '+(i+1)+' of 3'));
+  s.appendChild(el('p','q',c.q));
+  if(c.sub)s.appendChild(el('p','clin',c.sub));
+  const op=el('div','opts');
+  c.opts.forEach(([t,v])=>{const b=el('button','opt');b.type='button';
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{A.ctx[c.id]=v;save();i<2?screenCtx(i+1):screenBoard();};op.appendChild(b);});
+  s.appendChild(op);
+  wrap([bar('Doorway',undefined,()=>backCtx(i)),el('div','spacer'),s]);
+}
+function screenSection(si){
+  document.getElementById('stage').onclick=null;
+  const S=SEC[si];look(S.cam,si);
+  const h=el('div','hero fade');
+  h.appendChild(el('p','kick',S.kick+' · '+S.n));
+  h.appendChild(el('h1','h1',S.t));
+  h.appendChild(el('p','lede',S.d));
+  const b=el('button','btn amb',si===0?'Sit in on the meeting':(si===1?'Walk the floor':'Follow it out'));
+  b.onclick=()=>{A.qi=Q.findIndex(q=>q.s===si);screenQ();};
+  h.appendChild(b);
+  wrap([bar(S.n,si,si===0?screenIntro:()=>screenHandoff(si-1)),el('div','spacer'),h]);
+}
+function screenHandoff(si){
+  /* the order travels down, or the product is loaded */
+  const txt=si===0
+   ?{k:'The order goes down',t:'Head office has signed it off.',d:'The pod under the brain sends it down two ducts at once. Everything below depends on it arriving.'}
+   :{k:'The product is loaded',t:'Seventy-four days later, it’s ready.',d:'Finished units come off the line and enter the pipe. From here it is all about the way out.'};
+  if(SC){si===0?SC.memoDrop():SC.loadUp();}
+  const h=el('div','hero fade');
+  h.appendChild(el('p','kick',txt.k));
+  h.appendChild(el('h1','h1',txt.t));
+  h.appendChild(el('p','lede',txt.d));
+  const b=el('button','btn amb','Follow it');b.onclick=()=>screenSection(si+1);
+  h.appendChild(b);
+  const last=()=>{for(let i=Q.length-1;i>=0;i--)if(Q[i].s===si){A.qi=i;return screenQ();}screenSection(si);};
+  wrap([bar(SEC[si].n,si,last),el('div','spacer'),h]);
+}
+function screenQ(){
+  const q=Q[A.qi];A.sel=new Set(A.answers[A.qi]||[]);
+  look(q.f,q.s);SC&&SC.act(q.act);
+  if(SC)SC.clearInter();
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','Question '+(A.qi+1)+' of '+Q.length+' · '+ZONE[q.s].n));
+  s.appendChild(el('p','q',q.q));
+  if(q.note){
+    const w=el('button','why-t','Why this matters');
+    const d=el('p','why');d.textContent=q.note;d.style.display='none';
+    w.onclick=()=>{d.style.display=d.style.display==='none'?'block':'none';
+      w.textContent=d.style.display==='none'?'Why this matters':'Why this matters \u2014 hide';};
+    s.appendChild(w);s.appendChild(d);
+  }
+  s.appendChild(el('p','scene-note',q.sn));
+  const op=el('div','opts');
+  q.o.forEach(([t,v,ns],idx)=>{const b=el('button','opt'+(ns?' ns':''));b.type='button';b.setAttribute('aria-pressed',A.sel.has(idx)?'true':'false');
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{
+      if(v==='-'){op.querySelectorAll('.opt').forEach(x=>x.setAttribute('aria-pressed','false'));A.sel.clear();}
+      else{[...op.querySelectorAll('.opt')].forEach((x,j)=>{if(q.o[j][1]==='-')x.setAttribute('aria-pressed','false');});}
+      const on=b.getAttribute('aria-pressed')==='true';
+      b.setAttribute('aria-pressed',on?'false':'true');
+      if(on)A.sel.delete(idx);else A.sel.add(idx);
+      live(q);next.disabled=A.sel.size===0;
+      /* an exclusive answer is the whole answer: do not make him tap twice */
+      if(v==='-'&&!on)setTimeout(()=>commit(q),230);};
+    op.appendChild(b);});
+  s.appendChild(op);
+  const next=el('button','btn','Continue');next.disabled=A.sel.size===0;next.onclick=()=>commit(q);
+  if(A.sel.size)live(q);
+  s.appendChild(next);
+  wrap([bar(ZONE[q.s].n,q.s,A.qi>0?backQ:null),el('div','spacer'),s]);
+  requestAnimationFrame(()=>{
+    if(!SC)return;
+    const top=s.getBoundingClientRect().top/innerHeight;
+    SC.aim(q.f[0],q.f[1],q.f[2],q.f[3],2-q.s,Math.max(0.11,Math.min(0.34,top*0.46)));
+  });
+}
+/* Stop the line, or flag the bay, or just note it. Nothing else. */
+const STOP_F=['lump','acutePain'];
+const FLAG_F=['testosterone','hypogonadism','pituitary','udt2','chemo','genetic','vasectomy'];
+function live(q){
+  const v=[...A.sel].map(i=>q.o[i][1]).filter(x=>x!=='-');
+  const tier = v.some(x=>STOP_F.includes(x)) ? 'stop'
+             : v.some(x=>FLAG_F.includes(x)) ? 'flag'
+             : v.length ? 'note' : null;
+  if(SC)SC.mark(q.f[0],q.f[1],q.f[2],tier,A.qi);
+  if(v.includes('heat')||v.includes('fever'))SC&&SC.setHot(true);
+  if(v.includes('testosterone'))SC&&SC.shutOffice(true);
+  if(v.includes('vasectomy')||v.includes('obstruct'))SC&&SC.setBarrier(true);
+}
+function backQ(){ if(A.qi>0){A.qi--;screenQ();} }
+function backCtx(i){ if(i>0)screenCtx(i-1); else {A.qi=Q.length-1;screenQ();} }
+/* Rebuild every flag from what he actually has selected, so going back
+   and changing an answer really does unset it.                        */
+function recompute(){
+  A.flags={};
+  Object.keys(A.answers).forEach(k=>{const qq=Q[k];
+    A.answers[k].forEach(i=>{const v=qq.o[i][1];if(v!=='-')A.flags[v]=true;});});
+  if(SC){SC.setHot(!!(A.flags.heat||A.flags.fever));SC.shutOffice(!!A.flags.testosterone);}
+}
+function commit(q){
+  A.answers[A.qi]=new Set(A.sel);
+  recompute();save();
+  if(A.flags.lump||A.flags.acutePain)return screenUrgent();
+  A.qi++;
+  if(A.qi>=Q.length)return screenCtx(0);
+  const prev=q.s,now=Q[A.qi].s;
+  if(now!==prev)return screenHandoff(prev);
+  screenQ();
+}
+function screenUrgent(){
+  SC&&SC.wide();
+  const r=triage(A.flags);
+  const s=el('div','sheet plain fade');
+  s.appendChild(el('span','pill red','Stop here'));
+  const h=el('h1','h1',r.title);h.style.color='var(--ink)';s.appendChild(h);
+  s.appendChild(el('p','p b',r.why));
+  s.appendChild(el('p','p',r.extra));
+  const bx=el('div','box');
+  bx.innerHTML='<div class="k">Show them this</div><div class="l">Self-reported testicular lump or acute pain. Requesting urgent assessment. Screening tool output — not a diagnosis.</div>';
+  s.appendChild(bx);
+  s.appendChild(el('button','btn red','Find urgent care near me'));
+  s.appendChild(el('p','note','Your other answers are saved. You can come back any time.'));
+  wrap([bar('Doorway'),s]);
+}
+function screenBoard(){
+  SC&&SC.look(0,14.60,0,3.0,2);
+  const cnt=[0,0,0],tot=[0,0,0];
+  Q.forEach(q=>{tot[q.s]++;if(q.o.some(([t,v])=>v!=='-'&&A.flags[v]))cnt[q.s]++;});
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','The board has reconvened'));
+  s.appendChild(el('p','q','“Does anyone here know what actually leaves the loading bay?”'));
+  ZONE.forEach((z,i)=>{const row=el('div','row');
+    row.innerHTML='<span class="n '+(cnt[i]?'a':'g')+'">'+(cnt[i]||'✓')+'</span><span class="t">'+z.n+' — '+
+      (cnt[i]?cnt[i]+' concern'+(cnt[i]>1?'s':''):'clear')+'<s>'+tot[i]+' questions answered</s></span>';
+    s.appendChild(row);});
+  const b=el('button','btn','See the board’s decision');b.onclick=screenResult;s.appendChild(b);
+  wrap([bar('The Board',2),el('div','spacer'),s]);
+}
+function screenResult(){
+  const f=Object.assign({},A.flags,{months:A.ctx.months||0,partnerAge:A.ctx.partnerAge||0});
+  const r=triage(f);
+  const s=el('div','sheet plain fade');
+  s.appendChild(el('span','pill','The board has decided'));
+  const h=el('h1','h1',r.title);h.style.color='var(--ink)';s.appendChild(h);
+  s.appendChild(el('p','p b',r.why));
+  if(r.extra)s.appendChild(el('p','p',r.extra));
+  const plan=el('div','box');
+  plan.innerHTML='<div class="k">Getting the test done, privately</div><div class="l">'+
+   '<b>1.</b> Don’t ejaculate for 2 to 7 days beforehand.<br>'+
+   '<b>2.</b> Collect at home, in private — no clinic room.<br>'+
+   '<b>3.</b> Get it to a lab within the hour, kept warm.<br>'+
+   '<b>4.</b> Take the result and your summary to a doctor.</div>';
+  s.appendChild(plan);
+  if(A.flags.fever){const fb=el('div','box');fb.style.borderColor='var(--amber)';
+    fb.innerHTML='<div class="k">One thing about timing</div><div class="l">'+
+     'You said you had a fever or illness in the last three months. That on its own can push a semen analysis down. '+
+     'If the result comes back low, it should be repeated after three months before anyone concludes anything from it.</div>';
+    s.appendChild(fb);}
+  /* asked here, because this is where it is worth doing something about */
+  const lq=el('div','box');
+  lq.innerHTML='<div class="k">Anything here apply to you?</div>';
+  const lw=el('div','opts');lw.style.marginTop='9px';
+  LIFEQ.forEach(([t,v])=>{const b=el('button','opt');b.type='button';
+    b.setAttribute('aria-pressed',A.flags[v]?'true':'false');
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{A.flags[v]=!A.flags[v];screenResult();};lw.appendChild(b);});
+  lq.appendChild(lw);s.appendChild(lq);
+  const life=Object.keys(LIFE).filter(k=>A.flags[k]);
+  if(life.length){const lb=el('div','box');
+    lb.innerHTML='<div class="k">Worth changing either way</div><div class="l">'+life.map(k=>'• '+LIFE[k]).join('<br>')+'</div>';
+    s.appendChild(lb);
+    s.appendChild(el('p','note','Sperm take about 74 days to form, so changes show in a test about three months later.'));}
+  const named=Object.keys(A.flags).filter(k=>A.flags[k]&&k!=='unknown').map(k=>LBL[k]||k);
+  const sum=el('div','box');
+  sum.innerHTML='<div class="k">Summary for your doctor</div><div class="l">'+
+   'Trying: '+(A.ctx.months||0)+' months. Partner age: '+(A.ctx.partnerAge||'not given')+'.<br>'+
+   'Reported: '+(named.length?named.join(', '):'no risk factors reported')+'.<br>'+
+   'Route: '+r.title+' ('+r.rule+'). Screening output — not a diagnosis.</div>';
+  s.appendChild(sum);
+  const go=el('button','btn amb','Arrange the test \u2014 without going anywhere');
+  go.onclick=screenArrange;s.appendChild(go);
+  const mid=el('button','btn','Just send me the kit \u2014 I\u2019ll decide later');
+  mid.onclick=()=>{A.arr.method='unsure';screenDelivery();};s.appendChild(mid);
+  const rem=el('button','ghost','Remind me in a week');
+  rem.onclick=()=>{const n=el('p','note','We will. Nothing else happens until you say so.');
+    n.style.color='var(--ok)';rem.replaceWith(n);};s.appendChild(rem);
+  s.appendChild(el('button','btn','Send this summary to myself'));
+  const gh=el('button','ghost','Start again');
+  gh.onclick=askRestart;
+  s.appendChild(gh);
+  wrap([bar('Doorway'),s]);
+}
+
+
+/* ===================== ARRANGING THE TEST =====================
+   The screening is only half the door. This is the half nobody
+   writes down: what collection actually involves, said plainly,
+   and how the sample reaches a lab without him going anywhere.   */
+A.arr={method:null,comfort:new Set()};
+/* ---- ask a question: scripted answers, then a person ----
+   Deliberately not a free-form assistant. The religious question in
+   particular is one no app should answer, and this one does not.   */
+const SERVICE='7am to 11pm, seven days';
+const FAQ=[
+ ['What if I cannot produce a sample?',
+  'It happens, and it is not a verdict on you or on anything else. The kit keeps for a week. Put it away, try another day, and nobody is counting.'],
+ ['Does my wife have to know?',
+  'Only if you choose the sheath route, which needs her. The other way needs nobody. Either way we never contact her, and nothing arrives at your home with your name or ours on it.'],
+ ['Is this permitted in my religion?',
+  'We are not going to give you a ruling, and you should be wary of any app that does. What we can tell you is exactly what is involved, and that many couples use the collection sheath for this reason. If you want to talk it through, we will put you to a person.'],
+ ['Will the box say what it is?',
+  'No. Plain card. No clinic name, no markings, nothing on the outside but an address and your six-character code.'],
+ ['What if someone else answers the door?',
+  'The agent says they are collecting a package, and nothing else. They are not told what is inside and they do not ask. If you would rather not risk it at all, have the kit held at a locker.'],
+ ['Who sees my result?',
+  'You, first. The lab sees a code, not a name. Nobody else is sent anything unless you send it yourself.'],
+ ['How long until I know?',
+  'The analysis is done the same day the sample arrives, because it has to be. You get it back here, with a plain reading of it, that day.'],
+ ['Can I change my mind?',
+  'At any point, including after the kit has arrived. Nothing is kept if you stop.']
+];
+function askBtn(back){
+  const b=el('button','ghost','Ask a question');
+  b.onclick=()=>screenAsk(back);return b;
+}
+function screenAsk(back){
+  const s=arrShell('Ask a question','Ask before you commit to anything.');
+  s.appendChild(el('p','p b','These are what men ask most. If none of them is yours, a person will answer \u2014 you still do not give a name.'));
+  FAQ.forEach(([q,a])=>{
+    const w=el('div','box');w.style.padding='0';
+    const t=el('button','opt');t.type='button';t.style.cssText='border:0;background:none;width:100%;font-weight:700';
+    t.innerHTML='<span>'+q+'</span>';
+    const d=el('div','l');d.style.cssText='display:none;padding:0 14px 13px;font-size:13.5px;line-height:1.55;color:var(--mut)';
+    d.textContent=a;
+    t.onclick=()=>{d.style.display=d.style.display==='none'?'block':'none';};
+    w.appendChild(t);w.appendChild(d);s.appendChild(w);
+  });
+  const hb=el('button','btn amb','None of these \u2014 talk to a person');
+  const hd=el('div','box');hd.style.display='none';
+  hd.innerHTML='<div class="k">A person, not a bot</div><div class="l">'+
+   'Arabic or English, 7am to 11pm, seven days. You do not give a name, nothing you ask is attached to your test, '+
+   'and they will not give you a religious ruling either \u2014 but they will talk it through with you.</div>';
+  hb.onclick=()=>{hd.style.display=hd.style.display==='none'?'block':'none';};
+  s.appendChild(hb);s.appendChild(hd);
+  const g=el('button','ghost','Back');g.onclick=back;s.appendChild(g);
+  wrap([bar('Doorway'),s]);
+}
+
+const CODE=(()=>{const c='ACDEFHJKLMNPRTUVWXY349';let o='';for(let i=0;i<6;i++)o+=c[Math.floor(Math.random()*c.length)];return o;})();
+
+function arrShell(eyeb,title){
+  const s=el('div','sheet plain fade');
+  s.appendChild(el('p','eyeb',eyeb));
+  const h=el('h1','h1',title);h.style.color='var(--ink)';s.appendChild(h);
+  return s;
+}
+
+/* 1 · what the test is, and the part nobody mentions */
+function screenArrange(){
+  SC&&SC.look(2.4,1.15,-0.3,4.0,0);
+  const s=arrShell('Arranging the test · 1 of 4','One test settles the thing nobody can guess.');
+  s.appendChild(el('p','p b','A semen analysis counts what actually leaves. Nothing you have told us replaces it — a man with a serious problem almost always feels completely well.'));
+  s.appendChild(el('p','p','There is one part of this that nobody explains properly, so we will.'));
+  const kn=el('div','box');
+  kn.innerHTML='<div class="k">What we will have to know</div><div class="l">'+
+   'Up to here, nothing has left your phone. To actually run a test, three things are unavoidable: '+
+   'the agent needs an address, the lab needs a code to put on the tube, and we need somewhere to send the result.<br><br>'+
+   'That is the whole list. <b>Nobody in that chain is told why.</b> The lab sees a code, not a name. '+
+   'The agent sees a sealed box. This is private, not invisible \u2014 and we would rather say so.</div>';
+  s.appendChild(kn);
+  const b=el('button','btn amb','Tell me the awkward part');b.onclick=screenMethod;s.appendChild(b);
+  const g=el('button','ghost','Not now');g.onclick=()=>{A.express?screenIntro():screenResult();};s.appendChild(g);
+  wrap([bar('Doorway'),s]);
+}
+
+/* 2 · the collection, said plainly, with a real second route */
+function screenMethod(){
+  SC&&SC.look(3.0,1.06,0.5,2.5,0);
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','Arranging the test · 2 of 4'));
+  s.appendChild(el('p','q','To test semen, you have to produce semen.'));
+  s.appendChild(el('p','why','Usually that means masturbating into a sterile pot. At home, in your own bathroom, with the door locked — never in a clinic room, never with anyone waiting outside.'));
+  s.appendChild(el('p','scene-note','The pot is in the box, sealed, with the lid already loose.'));
+  const q=el('p','q','Which way would suit you?');q.style.fontSize='21px';q.style.marginTop='14px';s.appendChild(q);
+  const op=el('div','opts');
+  [['At home, on my own','solo'],
+   ['During sex with my wife, using a collection sheath','scd'],
+   ['I need to know first whether this is permitted for me','ask'],
+   ['I don’t know yet','unsure',1]].forEach(([t,v,ns])=>{
+    const b=el('button','opt'+(ns?' ns':''));b.type='button';
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{A.arr.method=v;screenMethodDetail();};op.appendChild(b);});
+  s.appendChild(op);
+  wrap([bar('Doorway'),el('div','spacer'),s]);
+}
+
+const METHOD={
+  solo:{t:'That is the standard way, and the easiest to get right.',
+    p:'At home, in your own bathroom, with the door locked. No clinic room, nobody waiting outside, no appointment.',
+    how:['Two to seven days without ejaculating first \u2014 not longer. Longer makes it worse, not better.',
+         'Collect straight into the sterile pot. Nothing else touches it: no lubricant, no container of your own.',
+         'Lid on, write the time on the card, press the button in the app.'],
+    good:['Nobody else needs to know, or be involved.',
+          'You choose the moment entirely.',
+          'The most predictable route, so the agent reaches you fastest.'],
+    watch:['The whole sample has to go in the pot. The first part carries most of the sperm.',
+           'If any is lost, say so on the card \u2014 it changes how the lab reads the result.',
+           'Ordinary lubricants kill sperm. If you need one, it is in the kit.']},
+  scd:{t:'A real option, and not a lesser test.',
+    p:'The lab reads it exactly the same way. Many couples use it \u2014 some because of faith, some because they would simply rather not be alone with it.',
+    how:['The kit contains a seminal collection sheath. It is <b>not</b> an ordinary condom \u2014 those are coated with spermicide and would destroy the sample.',
+         'Two to seven days without ejaculating first, the same as the other way.',
+         'Put it on as you would a condom and have sex normally.',
+         'Afterwards, empty all of it into the sterile pot, lid on, write the time.',
+         'Press the button in the app. The agent comes to you.'],
+    good:['Nothing is done alone, and nothing is done that your faith forbids.',
+          'The result is read identically \u2014 same reference ranges, same report.',
+          'For a lot of couples this removes the only real obstacle there was.'],
+    watch:['<b>You cannot book a slot for this.</b> You cannot schedule the moment, so pickup has to be on demand \u2014 collect, then press the button.',
+           'Some sample can be lost moving it from the sheath to the pot, and the first part is the richest. Say on the card if any was lost.',
+           'Your wife has to know, and has to take part. If that is not where you are yet, the other route needs nobody.',
+           'Collect while an agent can still reach you. Outside '+SERVICE.split(',')[0]+' the sample will not make the hour.']},
+  ask:{t:'That is a fair thing to want settled first.',
+    p:'Opinion differs among scholars. Many permit collection where there is a medical need and no other way; and for many couples the collection sheath avoids the question altogether.',
+    p2:'We are not going to tell you what your position should be. What we can give you is a plain page setting out exactly what is involved, to take to someone you trust.'},
+  unsure:{t:'You do not have to decide now.',
+    p:'The kit works for either route, and the choice is made at the last moment, by you, at home.',
+    p2:'Nothing is recorded about which way you chose.'}
+};
+const listBox=(k,items,ord)=>{const b=el('div','box');
+  b.innerHTML='<div class="k">'+k+'</div><div class="l">'+
+    items.map((t,i)=>(ord?'<b>'+(i+1)+'.</b> ':'\u2022 ')+t).join('<br>')+'</div>';
+  return b;};
+function screenMethodDetail(){
+  const m=METHOD[A.arr.method];
+  SC&&SC.look(3.0,1.06,0.5,2.6,0);
+  const s=arrShell('Arranging the test \u00b7 2 of 4',m.t);
+  s.appendChild(el('p','p b',m.p));
+  if(m.p2)s.appendChild(el('p','p',m.p2));
+  if(m.how)s.appendChild(listBox('How it works',m.how,true));
+  if(m.good)s.appendChild(listBox('What is good about it',m.good));
+  if(m.watch)s.appendChild(listBox('What to watch',m.watch));
+  if(A.arr.method==='ask'){
+    const bx=el('div','box');
+    bx.innerHTML='<div class="k">What that page says</div><div class="l">'+
+      'A semen analysis is a diagnostic test. There is no alternative test that answers the same question. '+
+      'Collection may be by masturbation or, during intercourse, by a non-spermicidal collection sheath. '+
+      'No sample is kept beyond the analysis.</div>';
+    s.appendChild(bx);
+  }
+  const b=el('button','btn amb','How it reaches the lab');b.onclick=screenComfort;s.appendChild(b);
+  s.appendChild(askBtn(screenMethodDetail));
+  const g=el('button','ghost','Choose a different way');g.onclick=screenMethod;s.appendChild(g);
+  wrap([bar('Doorway'),s]);
+}
+
+/* 3 · what would actually make this hard */
+function screenComfort(){
+  SC&&SC.look(2.4,1.15,-0.3,3.4,0);
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','Arranging the test · 3 of 4'));
+  s.appendChild(el('p','q','Is anything about this going to be difficult?'));
+  s.appendChild(el('p','why','Every one of these has a way round it. None of them is unusual.'));
+  const op=el('div','opts');
+  const OPTS=[['There is always someone else at home','home'],
+              ['I don’t want anything delivered to my address','deliver'],
+              ['I have tried before and could not','failed'],
+              ['I’d rather my wife didn’t know yet','private'],
+              ['Nothing','-']];
+  const next=el('button','btn','Continue');next.disabled=true;
+  OPTS.forEach(([t,v],i)=>{
+    const b=el('button','opt');b.type='button';b.setAttribute('aria-pressed','false');
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{
+      if(v==='-'){op.querySelectorAll('.opt').forEach(x=>x.setAttribute('aria-pressed','false'));A.arr.comfort.clear();}
+      else{[...op.querySelectorAll('.opt')].forEach((x,j)=>{if(OPTS[j][1]==='-')x.setAttribute('aria-pressed','false');A.arr.comfort.delete('-');});}
+      const on=b.getAttribute('aria-pressed')==='true';
+      b.setAttribute('aria-pressed',on?'false':'true');
+      if(on)A.arr.comfort.delete(v);else A.arr.comfort.add(v);
+      next.disabled=A.arr.comfort.size===0;};
+    op.appendChild(b);});
+  s.appendChild(op);
+  next.onclick=screenLogistics;s.appendChild(next);
+  wrap([bar('Doorway'),el('div','spacer'),s]);
+}
+
+const FIX={home:'You pick the window. The box is plain card with no clinic name on it, and it takes two minutes.',
+  deliver:'Then it goes to a locker, not your door. You collect it when you like.',
+  failed:'That happens, and it is not a verdict on you. The kit keeps for a week — try another day.',
+  private:'Then the sheath route is not for you right now, and the solo route needs nobody’s help.'};
+
+/* 4 · the hour, the temperature, and the agent */
+function screenLogistics(){
+  SC&&SC.look(5.2,1.2,0.2,2.8,0);SC&&SC.act('gates');
+  const s=arrShell('Arranging the test · 4 of 4','It never leaves your hands until it is sealed.');
+  const plan=el('div','box');
+  plan.innerHTML='<div class="k">What actually happens</div><div class="l">'+
+   '<b>1.</b> A plain box arrives. No clinic name, no markings.<br>'+
+   '<b>2.</b> Two to seven days without ejaculating.<br>'+
+   '<b>3.</b> Collect at home, whole sample in the pot, write the time on the card.<br>'+
+   '<b>4.</b> Press <i>collected</i> here. An agent is with you inside 15 minutes.<br>'+
+   '<b>5.</b> At the lab, analysed, inside the hour.</div>';
+  s.appendChild(plan);
+  const why=el('div','box');
+  why.innerHTML='<div class="k">Why the hour matters</div><div class="l">'+
+   'Sperm movement falls away as the sample cools and ages, and movement is half of what the lab is counting. '+
+   'The transport box holds it near body temperature — never in a fridge. '+
+   'A sample that sits in a car for ninety minutes is a wasted test and a wrong answer.</div>';
+  s.appendChild(why);
+  const priv=el('div','box');
+  priv.innerHTML='<div class="k">What the agent sees</div><div class="l">'+
+   'A sealed box with the code <b style="letter-spacing:2px">'+CODE+'</b> on it. '+
+   'Not your name. Not what is inside. Not why. They never open it, and they are not told.</div>';
+  s.appendChild(priv);
+  const fixes=[...A.arr.comfort].filter(k=>FIX[k]);
+  if(fixes.length){const fb=el('div','box');
+    fb.innerHTML='<div class="k">For what you told us</div><div class="l">'+fixes.map(k=>'• '+FIX[k]).join('<br>')+'</div>';
+    s.appendChild(fb);}
+  const b=el('button','btn amb','Send me the kit');b.onclick=screenDelivery;s.appendChild(b);
+  s.appendChild(askBtn(screenLogistics));
+  const g=el('button','ghost','Back');g.onclick=screenComfort;s.appendChild(g);
+  wrap([bar('Doorway'),s]);
+}
+
+/* ===================== THE VISIT, AND THE RESULT =====================
+   The agent exists for one reason: to keep the sample inside the hour
+   and near body temperature, so the man never has to walk into a
+   fertility centre. Then the result comes back to him, interpreted
+   simply, with a recommendation for who to see.                        */
+A.arr.delivery=null;A.arr.stage=0;A.arr.sample='low';
+
+const DELIVERY=[['Tomorrow, 9\u201310am','tomorrow 9\u201310am'],
+                ['Tomorrow, 6\u20137pm','tomorrow 6\u20137pm'],
+                ['Saturday, 10\u201311am','Saturday 10\u201311am'],
+                ['Hold it at a locker instead','locker pickup',1]];
+function screenDelivery(){
+  SC&&SC.look(2.4,1.15,-0.3,3.4,0);
+  const s=el('div','sheet fade');
+  s.appendChild(el('p','eyeb','Arranging the test \u00b7 the kit'));
+  s.appendChild(el('p','q','When should the kit arrive?'));
+  s.appendChild(el('p','why','Plain card, no clinic name, nothing written on the outside but an address and your code. Pick an hour that suits you \u2014 or have it held at a locker and collect it yourself.'));
+  s.appendChild(el('p','scene-note','This is the only thing that gets a time slot.'));
+  const op=el('div','opts');
+  DELIVERY.forEach(([t,v,ns])=>{const b=el('button','opt'+(ns?' ns':''));b.type='button';
+    b.innerHTML='<span class="bx"></span><span>'+t+'</span>';
+    b.onclick=()=>{A.arr.delivery=v;screenPickup();};op.appendChild(b);});
+  s.appendChild(op);
+  s.appendChild(askBtn(screenDelivery));
+  wrap([bar('Doorway'),el('div','spacer'),s]);
+}
+
+function screenPickup(){
+  SC&&SC.look(5.2,1.2,0.2,2.8,0);SC&&SC.act('gates');
+  const s=arrShell('Arranging the test \u00b7 the pickup','The pickup is not a booking. It is a button.');
+  s.appendChild(el('p','p b','You cannot schedule this one, and you should not try. The hour starts the moment you collect \u2014 so if you booked 9 to 10 and collected at five past, an agent arriving at ten to would already have wasted it.'));
+  s.appendChild(el('p','p','So you collect when you are ready, press the button, and an agent is with you inside 20 minutes.'));
+  const hrs=el('div','box');
+  hrs.innerHTML='<div class="k">When agents run</div><div class="l">'+
+   '<b>'+'7am to 11pm, seven days'+'.</b><br><br>'+
+   'Collect inside those hours. If you collect outside them the sample cannot make the lab in time, and the app will say so rather than let you send a test that cannot be read.</div>';
+  s.appendChild(hrs);
+  const sum=el('div','box');
+  const mt={solo:'at home, on your own',scd:'with your wife, using the collection sheath',
+            ask:'not decided \u2014 guidance page included',unsure:'decided at home, on the day'}[A.arr.method]||'decided at home';
+  sum.innerHTML='<div class="k">Your kit</div><div class="l">'+
+   'Code: <b style="letter-spacing:2px">'+CODE+'</b><br>Collection: '+mt+'<br>'+
+   'Kit arrives: '+(A.arr.delivery||'on demand')+'<br>'+
+   'Pickup: on demand, agent within 20 minutes<br>'+
+   'To the lab: near body temperature, inside the hour.</div>';
+  s.appendChild(sum);
+  s.appendChild(el('p','p','Nobody was told. You never sat in a waiting room. The result comes back here, to you, first.'));
+  const b=el('button','btn amb','Follow the kit');b.onclick=()=>{A.arr.stage=0;screenAgent();};s.appendChild(b);
+  s.appendChild(askBtn(screenPickup));
+  const g=el('button','ghost',A.express?'Back to the start':'Back to my summary');
+  g.onclick=()=>{A.express?screenIntro():screenResult();};s.appendChild(g);
+  wrap([bar('Doorway'),s]);
+}
+
+/* the visit, as a status the man can watch */
+const STAGE=[
+ {k:'Kit delivered',t:'The kit is at your door. Nothing is running yet.',
+  p:'Two to seven days without ejaculating, then collect whenever suits you. The clock only starts when you press the button \u2014 not before.',
+  b:'I have collected the sample'},
+ {k:'Agent on the way',t:'An agent will be with you in 11 minutes.',
+  p:'Put the pot in the transport sleeve now and close it. The sleeve holds the temperature; do not put it anywhere cold, and do not put it in a bag with anything else.',
+  b:'The agent has arrived'},
+ {k:'In transit',t:'On the way to the lab.',
+  p:'Handed over at the door in under a minute. You did not have to explain anything, and nothing has your name on it.',
+  b:'Arrived at the lab'},
+ {k:'At the lab',t:'At the lab, 41 minutes after you collected it.',
+  p:'Inside the hour, and it never dropped below body temperature. That is the whole reason the agent exists.',
+  b:'See the result'}
+];
+function screenAgent(){
+  const st=STAGE[A.arr.stage];
+  SC&&SC.look(A.arr.stage<2?3.0:5.2,1.1,A.arr.stage<2?0.5:0.2,2.7,0);
+  if(A.arr.stage>=2&&SC)SC.act('gates');
+  const s=el('div','sheet plain fade');
+  s.appendChild(el('span','pill',st.k));
+  const h=el('h1','h1',st.t);h.style.color='var(--ink)';s.appendChild(h);
+  s.appendChild(el('p','p b',st.p));
+  /* the two promises, shown as they are kept */
+  const m=el('div','box');
+  const mins=[0,0,22,41][A.arr.stage], tmp=[null,36.9,36.6,36.2][A.arr.stage];
+  m.innerHTML='<div class="k">The two things that matter</div><div class="l">'+
+    'Time since collection: <b>'+(A.arr.stage===0?'not started':mins+' min')+'</b> &nbsp;of 60<br>'+
+    'Temperature in the sleeve: <b>'+(tmp?tmp.toFixed(1)+'\u00b0C':'\u2014')+'</b> &nbsp;(never chilled)</div>';
+  s.appendChild(m);
+  const b=el('button','btn amb',st.b);
+  b.onclick=()=>{if(A.arr.stage<3){A.arr.stage++;screenAgent();}else screenLab();};
+  s.appendChild(b);
+  s.appendChild(el('p','note','Prototype: these steps advance on a tap. In use they arrive as notifications.'));
+  wrap([bar('Doorway'),s]);
+}
+
+/* ---- the result, and a simple reading of it ---- */
+/* Reference values: WHO laboratory manual, 6th edition (2021), 5th centiles. */
+const WHO={vol:1.4,conc:16,total:39,prog:30,motile:42,morph:4};
+const SAMPLES={
+  normal:{vol:3.2,conc:48,total:154,prog:44,motile:58,morph:6},
+  low:   {vol:2.4,conc:9, total:22, prog:22,motile:31,morph:3},
+  none:  {vol:1.9,conc:0, total:0,  prog:0, motile:0, morph:0}
+};
+function interpret(id,r){
+  if(id==='none')return{
+    pill:'Needs a specialist',
+    t:'No sperm were found in this sample.',
+    p:'That reads as final. It is not. \u201cNone found\u201d has to be confirmed on a second sample, spun down and looked at again, before anyone calls it azoospermia \u2014 and a real share of men with none in the fluid are still making sperm that can be retrieved.',
+    next:'A second sample, and a specialist appointment. Not a repeat in three months \u2014 now.',
+    refer:'Urology or andrology, with hormone tests (FSH, LH, testosterone) and an examination.'};
+  if(id==='low')return{
+    pill:'Repeat, and see a doctor',
+    t:'Three of the measures are below the reference range.',
+    p:'Concentration, movement and shape are all low. On its own that explains less than it seems to: sperm take about 74 days to make and a single sample swings a great deal, so one low result is a reason to test again, not a conclusion.',
+    next:'Repeat in about three months, and keep any changes you have made going in the meantime.',
+    refer:'Take this to a doctor now rather than waiting for the repeat \u2014 sooner if your partner is 36 or over.'};
+  return{
+    pill:'Within range',
+    t:'Everything measured is within the usual range.',
+    p:'That is genuinely good news, and it is not the end of the story. A normal semen analysis does not rule out a male factor, and it says nothing at all about your partner.',
+    next:'If you have been trying twelve months or more, you should both be seen \u2014 together.',
+    refer:'Primary care, as a couple.'};
+}
+function screenLab(){
+  SC&&SC.wide();
+  const id=A.arr.sample,r=SAMPLES[id],v=interpret(id,r);
+  const s=el('div','sheet plain fade');
+  s.appendChild(el('span','pill'+(id==='none'?' red':''),v.pill));
+  const h=el('h1','h1',v.t);h.style.color='var(--ink)';s.appendChild(h);
+  s.appendChild(el('p','p b',v.p));
+  const ROWS=[['Volume',r.vol.toFixed(1),'mL',WHO.vol,r.vol<WHO.vol],
+              ['Concentration',r.conc,'million/mL',WHO.conc,r.conc<WHO.conc],
+              ['Total count',r.total,'million',WHO.total,r.total<WHO.total],
+              ['Moving forward',r.prog,'%',WHO.prog,r.prog<WHO.prog],
+              ['Normal shape',r.morph,'%',WHO.morph,r.morph<WHO.morph]];
+  const tb=el('div','box');
+  tb.innerHTML='<div class="k">Your sample \u00b7 code '+CODE+'</div><div class="l">'+
+    ROWS.map(([n,val,u,lim,bad])=>'<span style="display:inline-block;min-width:118px">'+n+'</span>'+
+      '<b style="color:'+(bad?'var(--redink)':'var(--ok)')+'">'+val+' '+u+'</b>'+
+      '<span style="color:#9a9284"> &nbsp;usual: '+lim+'+</span>').join('<br>')+'</div>';
+  s.appendChild(tb);
+  const cav=el('div','box');
+  cav.innerHTML='<div class="k">What these numbers are not</div><div class="l">'+
+    'They are reference values taken from men whose partners conceived within a year. '+
+    'Below them does not mean you cannot father a child. Above them does not mean you will. '+
+    'They are the start of a conversation with a doctor, not a verdict on you.</div>';
+  s.appendChild(cav);
+  const nx=el('div','box');
+  nx.innerHTML='<div class="k">What to do next</div><div class="l">'+v.next+'</div>';
+  s.appendChild(nx);
+  const rf=el('div','box');
+  rf.innerHTML='<div class="k">Who to see</div><div class="l">'+v.refer+'</div>';
+  s.appendChild(rf);
+  const both=el('div','box');
+  both.innerHTML='<div class="k">This is half the picture</div><div class="l">'+
+   'A semen analysis looks at one of two people. Whatever it says, if you have been trying for '+
+   'twelve months \u2014 or six, if your partner is 36 or over \u2014 she needs to be seen as well. '+
+   'Her assessment is often the more time-critical one, and this result does not stand in for it.</div>';
+  s.appendChild(both);
+  const sum=el('div','box');
+  sum.innerHTML='<div class="k">Summary for your doctor</div><div class="l">'+
+    'Semen analysis, code '+CODE+'. Volume '+r.vol.toFixed(1)+' mL, concentration '+r.conc+' M/mL, '+
+    'total '+r.total+' M, progressive motility '+r.prog+'%, normal forms '+r.morph+'%. '+
+    'Collected at home, at the lab within 60 minutes, not chilled. '+
+    'Compared with WHO 6th edition lower reference limits. One sample \u2014 not a diagnosis.</div>';
+  s.appendChild(sum);
+  if(id!=='normal'){
+    const sup=el('div','box');sup.style.borderColor='var(--amber)';
+    sup.innerHTML='<div class="k">That is a lot to read on your own</div><div class="l">'+
+     'Men are rarely offered anyone to talk to about this, and the ones who need it most are the least '+
+     'likely to ask. Whatever you are feeling reading that \u2014 it is not an overreaction.</div>';
+    const tb=el('button','btn red','Talk to someone now');
+    const det=el('div','box');det.style.display='none';
+    det.innerHTML='<div class="k">What that is</div><div class="l">'+
+     'A trained counsellor who deals with this every day, in Arabic or English, at any hour. '+
+     'You do not give a name. Nothing you say is attached to your result or your record, '+
+     'and nobody is told you called.</div>';
+    tb.onclick=()=>{det.style.display=det.style.display==='none'?'block':'none';};
+    sup.appendChild(tb);sup.appendChild(det);s.appendChild(sup);}
+  s.appendChild(el('button','btn amb','Send this to my doctor'));
+  const row=el('div');row.style.cssText='display:flex;gap:6px;margin-top:10px';
+  [['Within range','normal'],['Low','low'],['None found','none']].forEach(([t,k])=>{
+    const g=el('button','ghost',t);g.style.cssText='flex:1;font-size:12px;padding:8px;border:1px solid var(--line);border-radius:10px';
+    if(k===id)g.style.background='#F6E7C9';
+    g.onclick=()=>{A.arr.sample=k;screenLab();};row.appendChild(g);});
+  s.appendChild(row);
+  s.appendChild(el('p','note','Prototype: tap to see each of the three outcomes.'));
+  wrap([bar('Doorway'),s]);
+}
+
+window.__scr={q:screenQ,section:screenSection,handoff:screenHandoff};window.__A=A;window.__nav={ask:()=>screenAsk(screenIntro),delivery:screenDelivery,pickup:screenPickup,intro:screenIntro,enter:screenEnter,ctx:()=>screenCtx(0),result:screenResult,arrange:screenArrange,method:screenMethod,board:screenBoard,agent:()=>{A.arr.stage=0;screenAgent();},lab:screenLab};
+screenIntro();
+boot3D().then(s=>{SC=s;window.__SC=s;window.__Q=Q;}).catch(e=>{console.error('3D unavailable',e);});
+</script>
