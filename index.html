@@ -1920,7 +1920,7 @@ render=function(){baseWoRender();renderWorkout();};
 
 // ---- Day history: earlier versions of the selected day, with restore ----
 const HIST_NAMES={solat:'Solat',solatNotes:'Prayer notes',protein:'Protein',pLog:'Protein entries',tasks:'Tasks',
-  workout:'Workout log',note:'Note',planNote:'Plan',mood:'Mood'};
+  workout:'Workout log',note:'Note',planNote:'Plan',mood:'Mood',tl:'FCPO learning hours',tlNote:'FCPO learning note'};
 const histKnown=()=>new Set([...Object.keys(blankDay()),...BOOL_KEYS,...Object.keys(HIST_NAMES)]);
 function histLabel(k){const g=document.querySelector('.row[data-key="'+k+'"] .goal');return g?g.textContent.trim():(HIST_NAMES[k]||k);}
 function histSummary(d){

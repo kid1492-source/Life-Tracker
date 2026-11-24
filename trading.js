@@ -1,5 +1,6 @@
 // Track tab: FCPO learning hours, shown like play time in a game.
 // Sessions are stored per day as o.tl = {items:[{id,m,at,l}], run:{s,l}}: m = minutes,
+// and the day's learning note as o.tlNote (same rich-text format as the other notes);
 // at = start time (ms), l = label. run = a timer that is going (start time in ms).
 // The day's record syncs like ticks; lists of items merge item by item across devices.
 // Reaching the daily target ticks the "Trading — CQG practice" habit (key cqg).
@@ -58,6 +59,10 @@ css.textContent=`
 .tl .ses .m{color:#F2C14E;font-weight:700;min-width:6ch;}
 .tl .ses .l{flex:1;color:var(--ink);}
 .tl .ses button{background:none;border:0;color:var(--muted);font:600 13px 'Inter',sans-serif;cursor:pointer;padding:2px 4px;}
+.tlnote{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px 10px;margin:-4px 0 12px;box-shadow:var(--shadow);}
+.tlnote .nh{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
+.tlnote .nh b{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#D9A15C;}
+.tlnote .nh span{margin-left:auto;font-size:11.5px;color:var(--muted);}
 .tl .ses .hd{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:8px 0 2px;}
 `;
 document.head.appendChild(css);
@@ -142,6 +147,13 @@ const cal=document.querySelector('.wrap .cal');
 const box=document.createElement('div');box.className='trackOnly';box.id='tlBox';
 const after=document.getElementById('focusBox')||cal;     // under Early wins and the goals
 after.parentNode.insertBefore(box,after.nextSibling);
+// The card is redrawn often; the note lives beside it so typing is never interrupted.
+const cardHost=document.createElement('div');box.appendChild(cardHost);
+const noteWrap=document.createElement('div');noteWrap.className='tlnote';
+noteWrap.innerHTML='<div class="nh"><b>✎ What I learned</b><span></span></div><div data-min="80" data-ph="Today\'s FCPO learning: setups, mistakes, rules to remember…"></div>';
+box.appendChild(noteWrap);
+const noteDay=noteWrap.querySelector('.nh span');
+const noteEd=richEditor(noteWrap.querySelector('[data-min]'),v=>{dayObj(sel).tlNote=v;scheduleSave();});
 let tick=null,confirmDel='',stopAsk=false;
 
 function draw(){
@@ -150,7 +162,9 @@ function draw(){
   const totalM=s.total+live,H=totalM/60;
   const next=MILESTONES.find(x=>x>H)||MILESTONES[MILESTONES.length-1]*2,prev=[...MILESTONES].reverse().find(x=>x<=H)||0;
   const dm=dayMins(o)+(r&&r.iso===selIso()?live:0);
-  box.innerHTML='';
+  cardHost.innerHTML='';
+  noteDay.textContent=isToday?'Today':DOW[new Date(year,month0,sel).getDay()]+' '+sel+' '+MONTHS[month0].slice(0,3);
+  noteEd.set(typeof o.tlNote==='string'?o.tlNote:'');
   const c=document.createElement('div');c.className='tl';
   c.innerHTML=`<div class="h"><b>📈 FCPO learning</b><span class="st"></span></div>
     <div class="tot"><span class="n"></span><span class="u">total</span></div>
@@ -223,7 +237,7 @@ function draw(){
         editDay(selIso(),d=>{if(d.tl&&Array.isArray(d.tl.items))d.tl.items=d.tl.items.filter(y=>y.id!==x.id);});};
       rw.append(t,m,l,del);ses.appendChild(rw);});
   }
-  box.appendChild(c);
+  cardHost.appendChild(c);
   clearInterval(tick);
   if(r)tick=setInterval(()=>{const el=box.querySelector('.run .clock');if(!el){clearInterval(tick);return;}
     const nowLive=(Date.now()-r.run.s)/60000;el.textContent=clock(Date.now()-r.run.s);
