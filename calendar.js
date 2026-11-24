@@ -139,7 +139,7 @@ const dayEl=view.querySelector('#calDay'), monthEl=view.querySelector('#calMonth
 // The Task section moves from Track to the Calendar day view (same lists, same data).
 const taskSec=document.getElementById('taskSec');
 if(taskSec){taskSec.classList.remove('trackOnly');dayEl.appendChild(taskSec);
-  const h=taskSec.querySelector('h2');if(h)h.textContent='Tasks · any time';}
+  const h=taskSec.querySelector('h2');if(h)h.textContent='Tasks';}
 
 const fab=document.createElement('button');
 fab.type='button';fab.className='cfab';fab.textContent='+';fab.setAttribute('aria-label','Add event');
