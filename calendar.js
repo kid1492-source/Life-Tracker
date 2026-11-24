@@ -16,7 +16,7 @@ css.textContent=`
 .cmg{padding:10px 6px 10px;margin-bottom:14px;}
 .cmg .wd{margin-bottom:4px;}
 .cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;}
-.cc{min-height:70px;border-radius:8px;padding:3px 2px;overflow:hidden;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;min-width:0;}
+.cc{position:relative;min-height:70px;border-radius:8px;padding:3px 2px;overflow:hidden;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;min-width:0;}
 .cc.empty{visibility:hidden;cursor:default;}
 .cc .n{font-size:11.5px;font-weight:600;text-align:center;margin-bottom:3px;color:var(--ink);}
 .cc.past .n{color:#D9A15C;}
@@ -104,6 +104,7 @@ css.textContent=`
 #calNoteSec .rt-ed{min-height:80px;background:var(--card);}
 .cnote-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:6px 2px 0;}
 .cc .npen{font-size:9px;color:var(--muted);text-align:center;line-height:1;margin-top:auto;}
+.cc .cwon{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:#6CCB73;}
 .cnoteprev{padding:10px 14px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--ink);cursor:pointer;max-height:6.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent);}
 .cnoteprev ul,.cnoteprev ol{margin:2px 0;padding-left:18px;}
 .cnoteprev .lbl{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
@@ -206,6 +207,7 @@ function renderMonth(list){
     evs.slice(0,2).forEach(ev=>{const c=document.createElement('div');c.className='cchip'+(ev.status===2?' cx':'');
       c.style.background=COLORS[ev.color]||COLORS.green;c.textContent=ev.title;b.appendChild(c);});
     if(evs.length>2){const m=document.createElement('div');m.className='cmore';m.textContent='+'+(evs.length-2)+' more';b.appendChild(m);}
+    if(typeof dayWon==='function'&&dayWon(days[d])){const w=document.createElement('div');w.className='cwon';w.title='Day won';w.setAttribute('aria-hidden','true');b.appendChild(w);}
     if(rtText(planNoteOf(d))){const pn=document.createElement('div');pn.className='npen';pn.textContent='✎';pn.setAttribute('aria-hidden','true');b.appendChild(pn);}
     b.setAttribute('aria-label',dow(d)+' '+d+' '+MONTHS[month0]+(evs.length?', '+evs.length+' event'+(evs.length>1?'s':''):'')+(rtText(planNoteOf(d))?', has a note':''));
     b.onclick=()=>{if(sel===d){openDay();return;}sel=d;render();};
