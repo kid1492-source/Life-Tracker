@@ -1,4 +1,4 @@
-// Track tab: "Today's focus" (2–3 key habits with streaks) and goals with a reward.
+// Track tab: "Early wins" (up to 4 key habits with streaks) and goals with a reward.
 // Settings (which habits are in focus, the goals) sync through the reviews table under the
 // special month key 0000-00: each setting is one entry in review.weekly, so the existing
 // sync merges them one by one. A goal's progress is worked out from the daily ticks.
@@ -7,8 +7,8 @@
 (function(){
 'use strict';
 const SKEY='tracker:0000-00';
-const MAX_FOCUS=3, MAX_GOALS=3;
-const DEFAULT_FOCUS=['mWake','tahajud','mFajr'];
+const MAX_FOCUS=4, MAX_GOALS=3;
+const DEFAULT_FOCUS=['mWake','tahajud','mFajr','mGoals'];
 
 // ---------- styles ----------
 const css=document.createElement('style');
@@ -149,7 +149,7 @@ function evalGoal(g){
 // ---------- markup ----------
 const cal=document.querySelector('.wrap .cal');
 const box=document.createElement('div');box.className='trackOnly';box.id='focusBox';
-box.innerHTML=`<div class="fcard"><div class="fh"><b id="fTitle">Today's focus</b><span class="fd" id="fDay"></span>
+box.innerHTML=`<div class="fcard"><div class="fh"><b id="fTitle">Early wins</b><span class="fd" id="fDay"></span>
   <button type="button" class="flink" id="fEdit">Edit</button></div><div id="fRows"></div></div><div id="gBox"></div>`;
 cal.parentNode.insertBefore(box,cal.nextSibling);   // calendar first, then focus and goals
 
@@ -169,7 +169,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&wrap.classList.cont
 // ---------- focus card ----------
 function drawFocus(){
   const isToday=year===REAL.getFullYear()&&month0===REAL.getMonth()&&sel===REAL.getDate();
-  $('fTitle').textContent=isToday?"Today's focus":'Focus';
+  $('fTitle').textContent='Early wins';
   $('fDay').textContent=DOW[new Date(year,month0,sel).getDay()]+' '+sel;
   const rows=$('fRows');rows.innerHTML='';
   const o=days[sel]||{};
@@ -189,17 +189,17 @@ function drawFocus(){
 $('fEdit').onclick=()=>{
   let pick=focusKeys();
   const body=document.createElement('div');
-  const hint=document.createElement('p');hint.className='fhint';hint.textContent='Pick up to 3. They stay in their usual sections too — ticking either place is the same tick.';
+  const hint=document.createElement('p');hint.className='fhint';hint.textContent='Pick up to 4. They stay in their usual sections too — ticking either place is the same tick.';
   body.appendChild(hint);
   const list=document.createElement('div');
   const draw=()=>{list.innerHTML='';DAILY_KEYS.forEach(k=>{const on=pick.includes(k);
     const r=document.createElement('div');r.className='fpick'+(on?' on':'');r.setAttribute('role','checkbox');r.setAttribute('aria-checked',on);r.tabIndex=0;
     r.innerHTML=CHECK+'<span></span>';r.querySelector('span').textContent=label(k);
-    const t=()=>{if(on)pick=pick.filter(x=>x!==k);else if(pick.length<MAX_FOCUS)pick=pick.concat(k);else{$('fsErr').textContent='Up to 3 — untick one first.';return;}
+    const t=()=>{if(on)pick=pick.filter(x=>x!==k);else if(pick.length<MAX_FOCUS)pick=pick.concat(k);else{$('fsErr').textContent='Up to 4 — untick one first.';return;}
       $('fsErr').textContent='';draw();};
     r.onclick=t;r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();t();}};list.appendChild(r);});};
   draw();body.appendChild(list);
-  openSheet('Edit focus',body,async()=>{if(!pick.length)return 'Pick at least one habit.';
+  openSheet('Edit early wins',body,async()=>{if(!pick.length)return 'Pick at least one habit.';
     pick.sort((a,b)=>DAILY_KEYS.indexOf(a)-DAILY_KEYS.indexOf(b));await setSetting('focus',JSON.stringify(pick));});
 };
 

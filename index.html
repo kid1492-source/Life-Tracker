@@ -376,6 +376,7 @@
       <div class="row" data-key="mWake"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Wake up</div><div class="freq">5:00 AM</div></div></div>
       <div class="row" data-key="tahajud"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Tahajud</div><div class="freq">Night prayer</div></div></div>
       <div class="row" data-key="mFajr"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Fajr</div><div class="freq">On time</div></div></div>
+      <div class="row" data-key="mGoals"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Read &amp; Review Goals</div><div class="freq">Start the day with them</div></div></div>
       <div class="row" data-key="mQuran"><div class="check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div><div><div class="goal">Quran</div><div class="freq">After Fajr</div></div></div>
     </div>
   </section>
@@ -1194,7 +1195,7 @@ let year=REAL.getFullYear(), month0=REAL.getMonth();
 const PRAYERS=[["Fajr","Dawn"],["Dhuhr","Noon"],["Asr","Aftn"],["Maghrib","Dusk"],["Isha","Night"]];
 // Daily habits count towards the day's %. Weekly (Mon–Sun) and monthly habits are scored
 // against their own target instead, so they never pull a day down.
-const DAILY_KEYS=['mWake','mFajr','mQuran','nPlan','dJournal',
+const DAILY_KEYS=['mWake','mFajr','mGoals','mQuran','nPlan','dJournal',
   'dRelVid','dEduVid','dDeep','xWorkout','dHajat','tahajud','cqg'];
 const PERIOD_HABITS=[
   {key:'taubat',name:'Taubat / deep prayer',per:'week',target:2},
@@ -2006,7 +2007,7 @@ document.getElementById('dhHist').onclick=openHistory;
 // Early morning win: the first three habits of the day, all done.
 const EARLY=[['mWake','Wake up'],['tahajud','Tahajud'],['mFajr','Fajr (early)']];
 const earlyWin=o=>!!o&&EARLY.every(([k])=>o[k]===1);
-const HABITS=[...EARLY,['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],
+const HABITS=[...EARLY,['mGoals','Goals'],['mQuran','Quran'],['dJournal','Journal'],['nPlan','Plan'],
   ['dRelVid','Religious vid'],['dEduVid','Edu vid'],['dDeep','Deep work'],['xWorkout','Workout'],['dHajat','Hajat'],['taubat','Taubat'],
   ['cqg','CQG'],['wife','Wife'],['ibu','Call ibu'],['parents','Parents']];
 const NS='http://www.w3.org/2000/svg';
@@ -2193,5 +2194,6 @@ loadMonth();
 </script>
 <script src="calendar.js"></script>
 <script src="focus.js"></script>
+<script src="trading.js"></script>
 </body>
 </html>
