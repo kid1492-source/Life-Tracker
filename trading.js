@@ -140,7 +140,8 @@ function stats(){
 // ---------- markup ----------
 const cal=document.querySelector('.wrap .cal');
 const box=document.createElement('div');box.className='trackOnly';box.id='tlBox';
-cal.parentNode.insertBefore(box,cal.nextSibling);          // right under the calendar
+const after=document.getElementById('focusBox')||cal;     // under Early wins and the goals
+after.parentNode.insertBefore(box,after.nextSibling);
 let tick=null,confirmDel='',stopAsk=false;
 
 function draw(){
