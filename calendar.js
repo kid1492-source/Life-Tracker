@@ -183,7 +183,7 @@ function items(){const all=P()?P().all():{};return Object.keys(all).map(id=>Obje
 function eventsOn(day,list){return (list||items()).filter(x=>x.day===day).sort((a,b)=>
   (a.start_time||'').localeCompare(b.start_time||'')||(a.end_time||'').localeCompare(b.end_time||'')||String(a.title).localeCompare(String(b.title)));}
 function tasksLeft(){const T=(days[sel]&&days[sel].tasks)||{};let n=0;
-  TASK_COLS.forEach(([c])=>(T[c]||[]).forEach(x=>{if(x&&String(x.t||'').trim()&&!x.d&&!x.sk)n++;}));return n;}
+  (typeof TASK_LISTS!=='undefined'?TASK_LISTS:TASK_COLS).forEach(([c])=>(T[c]||[]).forEach(x=>{if(x&&String(x.t||'').trim()&&!x.d&&!x.sk)n++;}));return n;}
 function check(st,onTap,label){const b=document.createElement('button');b.type='button';
   b.className='cck'+(st===1?' on':st===2?' x':'');b.textContent=st===1?'✓':st===2?'✕':'';
   b.setAttribute('aria-label',label+': '+(st===1?'done':st===2?'cancelled':'not yet')+'. Tap to change.');
