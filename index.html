@@ -225,8 +225,6 @@
   .tmeta .test,.tmeta .trp,.tmeta .tclr,.tmeta .tskip{margin-top:0;}
   .tflag{display:inline-flex;align-items:center;justify-content:center;width:30px;height:24px;background:none;border:1px solid #4A4942;color:#6E6C64;border-radius:20px;padding:0;font:inherit;font-size:13px;cursor:pointer;filter:grayscale(1);opacity:.7;}
   .tflag.on{filter:none;}
-  .tflag.urg.on{border-color:#7a3d3d;color:#F07070;background:rgba(240,112,112,.10);opacity:1;}
-  .tflag.imp.on{border-color:#6b5a2c;color:#F2C14E;background:rgba(242,193,78,.10);opacity:1;}
   .trow.done .tflag{opacity:.4;}
   .tday{position:relative;display:inline-flex;align-items:center;border:1px solid #34506e;color:#7FB2E5;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer;}
   .tday input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;color-scheme:dark;}
@@ -274,6 +272,14 @@
   .tbox .nm{font-size:15px;font-weight:800;letter-spacing:-.01em;}
   .tbox.deep .nm{font-size:17px;}
   .tbox .bn{font-family:'Fraunces',serif;font-size:15px;font-weight:700;}
+  .tbox .btm{color:#D9A15C;font-weight:700;}
+  .tmove{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 12px 12px 46px;}
+  .tmove span{font-size:11.5px;font-weight:600;color:var(--muted);margin-right:2px;}
+  .tmove button{background:none;border:1px solid #4A4942;color:var(--muted);border-radius:20px;padding:4px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+  .tmove button.on.deep{color:#F07070;border-color:#7a3d3d;background:rgba(240,112,112,.12);}
+  .tmove button.on.quick{color:#F2C14E;border-color:#6b5a2c;background:rgba(242,193,78,.12);}
+  .tmove button.on.plan{color:#7FB2E5;border-color:#34506e;background:rgba(127,178,229,.12);}
+  .tmove button.on.pocket{color:#7DCB7D;border-color:#2f5a32;background:rgba(125,203,125,.12);}
   .tbox .bh small{display:block;font-size:10.5px;font-weight:600;color:var(--muted);margin-top:1px;}
   .ti{display:flex;gap:7px;align-items:flex-start;padding:7px 3px;border-top:1px solid rgba(255,255,255,.07);border-radius:6px;}
   .ti .tchk{width:19px;height:19px;border-radius:5px;margin-top:0;}
@@ -1643,11 +1649,18 @@ saveBtn.onclick=async()=>{
 // r = repeats daily {s,u}, sk = skipped today. A day with no tasks
 // field was never set up. When today is opened, unfinished tasks from earlier days are
 // copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
-// Eisenhower matrix. Each list is one quadrant; ⚡ urgent / ★ important decide which.
-// (deep / quick / pocket keep their old names so older days and other devices still match.)
-const TASK_COLS=[['deep','Do now','Urgent + important'],['plan','Schedule','Important, not urgent · give it a day'],['quick','Quick','Urgent, not important · do fast or hand off'],['pocket','Someday','Not urgent, do in spare moments']];
-const TASK_FLAGS={deep:[1,1],plan:[0,1],quick:[1,0],pocket:[0,0]};          // [urgent, important]
-const colForFlags=(u,i)=>u&&i?'deep':i?'plan':u?'quick':'pocket';
+// Four boxes, sorted by the kind of time a task needs. "This week" tasks get a deadline
+// (the Sunday of the week they were added, or a day picked).
+const TASK_COLS=[['deep','Deep work','30+ min, no interruptions'],['quick','Quick wins','5–10 min'],['plan','This week','Important · finish by Sunday'],['pocket','Pocket','Spare moments']];
+const BOX_SHORT={deep:'Deep',quick:'Quick',plan:'This week',pocket:'Pocket'};
+const sundayOf=iso=>isoAdd(iso,(7-isoDate(iso).getDay())%7);
+// "4 days left" / "Due today" / "⚠ Overdue 23 Nov"
+function dueText(on,long){const t0=todayIso();
+  if(on<t0)return '⚠ Overdue'+(long?' · ':' ')+fmtIso(on).replace(/^\S+ /,'');
+  if(on===t0)return 'Due today';
+  const n=Math.round((isoDate(on)-isoDate(t0))/864e5);
+  return n===1?'Due tomorrow':n+' days left';}
+const dueCls=on=>{const t0=todayIso();return on<t0?'late':on===t0?'today':'day';};
 const MIT_MAX=3;   // most important tasks of the day: finish them all and the day is won
 const openTask=x=>x&&!x.d&&!x.sk&&String(x.t||'').trim();
 const todayIso=()=>isoOf(REAL.getFullYear(),REAL.getMonth(),REAL.getDate());
@@ -1660,12 +1673,11 @@ function toggleMit(c,id){
   else{if(dayMits(T).length>=MIT_MAX){taskFlash('','You already have '+MIT_MAX+' MITs. Untick 🎯 on one first.');return;}x.m=1;}
   save();renderTasks(true);
 }
-// Flip urgent (0) or important (1): the task moves to its new quadrant.
-function flipTask(c,id,which){
-  const T=dayTasks(dayObj(sel)),x=T[c].find(y=>y.id===id);if(!x)return;
-  const f=TASK_FLAGS[c].slice();f[which]=f[which]?0:1;const to=colForFlags(f[0],f[1]);
+// Move a task to another box.
+function moveTask(c,id,to){
+  const T=dayTasks(dayObj(sel)),x=T[c].find(y=>y.id===id);if(!x||to===c)return;
   T[c]=T[c].filter(y=>y.id!==id);
-  if(to!=='plan')delete x.on;
+  if(to==='plan'){if(!x.on)x.on=sundayOf(todayIso());}else delete x.on;
   T[to].push(x);
   if(taskEdit&&taskEdit.id===id)taskEdit.c=to;
   save();renderTasks(true);
@@ -1680,7 +1692,7 @@ function findTask(c,id){return dayTasks(dayObj(sel))[c].find(x=>x.id===id);}
 function focusTask(id){const el=taskGrid.querySelector('.tedit [data-id="'+id+'"] .ttxt');if(el){el.focus();el.closest('.tedit').scrollIntoView({block:'nearest',behavior:'smooth'});}}
 function addTask(c,afterId){
   const T=dayTasks(dayObj(sel)),list=T[c];
-  const it={id:newTaskId(),t:'',d:0};
+  const it={id:newTaskId(),t:'',d:0};if(c==='plan')it.on=sundayOf(selIso());
   const i=afterId?list.findIndex(x=>x.id===afterId):-1;
   if(i>=0)list.splice(i+1,0,it);else list.push(it);
   taskEdit={c,id:it.id};taskPal='';taskRep='';
@@ -1750,23 +1762,16 @@ function taskRow(c,it){
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(inp.value.trim())addTask(c,it.id);else inp.blur();}};
   if(it.k&&!it.d)inp.style.color=it.k;
   main.appendChild(inp);main.appendChild(meta);
-  const fl=TASK_FLAGS[c];
   const mb=document.createElement('button');mb.type='button';mb.className='tflag mit'+(it.m?' on':'');mb.textContent='🎯 MIT';
   mb.setAttribute('aria-pressed',it.m?'true':'false');mb.title='Most important task of the day';
   mb.onclick=()=>toggleMit(c,it.id);meta.appendChild(mb);
-  [['⚡','Urgent',0],['★','Important',1]].forEach(([ic,name,w])=>{
-    const b=document.createElement('button');b.type='button';b.className='tflag '+(w?'imp':'urg')+(fl[w]?' on':'');
-    b.textContent=ic;b.title=name;b.setAttribute('aria-label',name);
-    b.setAttribute('aria-pressed',fl[w]?'true':'false');
-    b.onclick=()=>flipTask(c,it.id,w);meta.appendChild(b);
-  });
-  if(c==='plan'){                                   // Schedule: pick the day to do it
-    const t0=todayIso(),dc=document.createElement('label');
-    dc.className='tday'+(!it.on?' none':it.on<t0?' late':it.on===t0?' today':'');
+  if(c==='plan'){                                   // This week: deadline, tap to change
+    const on=it.on||sundayOf(todayIso()),dc=document.createElement('label');
+    dc.className='tday'+(on<todayIso()?' late':on===todayIso()?' today':'');
     const sp=document.createElement('span');
-    sp.textContent=!it.on?'📅 Pick a day':it.on<t0?'⚠ '+fmtIso(it.on).replace(/^\S+ /,''):it.on===t0?'📅 Today':'📅 '+fmtIso(it.on);
-    const di=document.createElement('input');di.type='date';di.value=it.on||'';di.setAttribute('aria-label','Day to do it');
-    di.onchange=()=>{const x=findTask(c,it.id);if(!x)return;if(di.value)x.on=di.value;else delete x.on;save();renderTasks(true);};
+    sp.textContent=on<todayIso()?dueText(on,1):'📅 Due '+fmtIso(on)+(on===todayIso()?' (today)':'');
+    const di=document.createElement('input');di.type='date';di.value=on;di.setAttribute('aria-label','Deadline');
+    di.onchange=()=>{const x=findTask(c,it.id);if(!x)return;x.on=di.value||sundayOf(todayIso());save();renderTasks(true);};
     dc.append(sp,di);meta.appendChild(dc);
   }
   // Expected time, e.g. 30m or 1h 30m. Typed as 30, 30m, 1h, 1.5h, 1h30 or 1:30.
@@ -1826,7 +1831,6 @@ const taskSigNow=()=>storeKey()+':'+sel+':'+JSON.stringify((days[sel]&&days[sel]
 // The matrix: four boxes with the tasks inside. Tap a task to edit it in the panel below.
 let taskEdit=null;                         // {c,id} of the task open in the edit panel
 const taskMore={};                         // boxes showing all their tasks
-const TASK_BOX={deep:['⚡ urgent · ★ important'],plan:['★ important'],quick:['⚡ urgent'],pocket:['neither']};
 const BOX_SHOW=5;
 function openEdit(c,id){taskEdit=taskEdit&&taskEdit.id===id?null:{c,id};taskPal='';taskRep='';renderTasks(true);
   if(taskEdit){const pn=taskGrid.querySelector('.tedit');if(pn)pn.scrollIntoView({block:'nearest',behavior:'smooth'});}}
@@ -1843,7 +1847,7 @@ function boxItem(c,it){
   if(it.k&&!it.d)tx.style.color=it.k;
   body.appendChild(tx);
   const m=[];
-  if(c==='plan'&&it.on)m.push([it.on<t0?'late':it.on===t0?'today':'day',it.on<t0?'⚠ '+fmtIso(it.on).replace(/^\S+ /,''):it.on===t0?'Today':fmtIso(it.on).replace(/^\S+ /,'')]);
+  if(c==='plan'&&it.on&&!it.d)m.push([dueCls(it.on),dueText(it.on)]);
   if(it.e)m.push(['tm',it.e]);
   if(it.r)m.push(['rp','↻']);
   if(it.sk)m.push(['sk','skipped']);
@@ -1886,23 +1890,25 @@ function renderTasks(force){
   taskSig=sig;
   const o=days[sel],T=(o&&o.tasks)||{};
   if(taskEdit&&!(Array.isArray(T[taskEdit.c])&&T[taskEdit.c].some(x=>x.id===taskEdit.id)))taskEdit=null;
+  // This week tasks without a deadline (made before deadlines existed) get this Sunday.
+  if(selIso()===todayIso()&&Array.isArray(T.plan)){let f=0;T.plan.forEach(x=>{if(x&&!x.on){x.on=sundayOf(todayIso());f=1;}});if(f)scheduleSave();}
   taskGrid.innerHTML='';
   taskGrid.appendChild(mitCard(T));
   const mx=document.createElement('div');mx.className='tmx';
-  TASK_COLS.forEach(([c,nm])=>{
+  TASK_COLS.forEach(([c,nm,sub])=>{
     let list=(Array.isArray(T[c])?T[c]:[]).filter(x=>String(x.t||'').trim()||(taskEdit&&taskEdit.id===x.id));
     const open=list.filter(x=>!x.d&&!x.sk).length;
     // Unfinished first; Schedule by date.
     list=list.slice().sort((a,b)=>(!!a.d-!!b.d)||(c==='plan'?((a.on||'9')<(b.on||'9')?-1:(a.on||'9')>(b.on||'9')?1:0):0));
     const bx=document.createElement('div');bx.className='tbox '+c;bx.dataset.c=c;
     const hd=document.createElement('div');hd.className='bh';
-    hd.innerHTML='<div class="bt"><span class="nm"></span><span class="bn"></span></div><small></small>';
-    hd.querySelector('.nm').textContent=nm;hd.querySelector('small').textContent=TASK_BOX[c][0];
+    hd.innerHTML='<div class="bt"><span class="nm"></span><span class="bn"></span></div><small><span class="sb"></span><b class="btm"></b></small>';
+    hd.querySelector('.nm').textContent=nm;hd.querySelector('.sb').textContent=sub;
     hd.querySelector('.bn').textContent=open||'';
     bx.appendChild(hd);
-    const lim=c==='deep'||taskMore[c]?list.length:BOX_SHOW;
+    const lim=taskMore[c]?list.length:BOX_SHOW;
     list.slice(0,lim).forEach(it=>bx.appendChild(boxItem(c,it)));
-    if(list.length>BOX_SHOW&&c!=='deep'){const mb=document.createElement('button');mb.type='button';mb.className='tbmore';
+    if(list.length>BOX_SHOW){const mb=document.createElement('button');mb.type='button';mb.className='tbmore';
       mb.textContent=taskMore[c]?'Show less':'+'+(list.length-BOX_SHOW)+' more';
       mb.onclick=()=>{taskMore[c]=!taskMore[c];renderTasks(true);};bx.appendChild(mb);}
     const add=document.createElement('button');add.type='button';add.className='tbadd';add.textContent='+ Add';
@@ -1921,17 +1927,26 @@ function renderTasks(force){
     dn.onclick=()=>{taskEdit=null;taskPal='';taskRep='';if(pruneEmptyTasks())scheduleSave();renderTasks(true);};
     ph.appendChild(dn);pn.appendChild(ph);
     pn.appendChild(taskRow(c,it));
+    const mv=document.createElement('div');mv.className='tmove';mv.innerHTML='<span>Box</span>';
+    TASK_COLS.forEach(([k])=>{const b=document.createElement('button');b.type='button';b.className=k+(k===c?' on':'');
+      b.textContent=BOX_SHORT[k];b.onclick=()=>moveTask(c,it.id,k);mv.appendChild(b);});
+    pn.appendChild(mv);
     if(taskPal===it.id)pn.appendChild(taskPalette(c,it));
     if(taskRep===it.id)pn.appendChild(repeatPanel(c,it));
     // Opens right under the row of boxes the task is in.
-    const after=mx.querySelector(c==='deep'||c==='plan'?'.tbox.plan':'.tbox.pocket');
+    const after=mx.querySelector(c==='deep'||c==='quick'?'.tbox.quick':'.tbox.pocket');
     after.after(pn);
   }
   taskGrid.querySelectorAll('.ttxt').forEach(fitTask);
   updateTaskHeads();
 }
-// Edit panel header: time still needed in that box.
-function updateTaskHeads(){}
+// Box header: time still needed for unfinished tasks in Deep work and Quick wins.
+function updateTaskHeads(){
+  const T=(days[sel]&&days[sel].tasks)||{};
+  taskGrid.querySelectorAll('.tbox').forEach(bx=>{const c=bx.dataset.c,el=bx.querySelector('.btm');if(!el)return;
+    const left=(Array.isArray(T[c])?T[c]:[]).reduce((a,x)=>a+(x&&!x.d&&!x.sk&&parseMins(x.e)||0),0);
+    el.textContent=(c==='deep'||c==='quick')&&left?' · ~'+fmtMins(left):'';});
+}
 // Long tasks wrap onto more lines instead of being cut off.
 function fitTask(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 window.addEventListener('resize',()=>taskGrid.querySelectorAll('.ttxt').forEach(fitTask));
