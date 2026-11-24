@@ -45,7 +45,10 @@ css.textContent=`
 .gpips span.today{box-shadow:inset 0 0 0 2px var(--ink);}
 .gcomp{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;line-height:1.4;}
 .gcomp .gb{margin-left:auto;background:#43A047;color:#fff;border:0;font:700 12.5px 'Inter',sans-serif;border-radius:9px;padding:8px 12px;white-space:nowrap;cursor:pointer;}
-.gfoot{display:flex;justify-content:flex-end;margin-top:6px;}
+.gfoot{display:flex;justify-content:flex-end;align-items:center;margin-top:6px;}
+.glvup{margin-right:auto;background:#F2C14E;color:#2a2418;border:0;font:800 13px 'Inter',sans-serif;border-radius:10px;padding:8px 14px;cursor:pointer;}
+.glv{font-style:normal;font-size:11px;font-weight:800;color:#F2C14E;border:1px solid #6b5a2c;border-radius:20px;padding:1px 7px;margin-left:8px;vertical-align:2px;}
+.gtro{font-size:12px;font-weight:600;color:#D9A15C;margin:-4px 0 8px;}
 .gnew{display:block;width:100%;background:none;border:1px dashed var(--line);color:var(--muted);border-radius:14px;padding:11px;font:600 13px 'Inter',sans-serif;cursor:pointer;margin-bottom:12px;}
 .fpick{display:flex;align-items:center;gap:12px;padding:11px 2px;border-top:1px solid var(--line);cursor:pointer;font-size:14.5px;}
 .fpick:first-child{border-top:none;}
@@ -212,6 +215,8 @@ function drawGoals(){
     c.className='gcard'+(e.won?' won':e.compDue?' miss':'');
     const t=document.createElement('div');t.className='gt';
     const tt=document.createElement('span');tt.textContent=(e.won?'🎉 ':'🎯 ')+label(g.key)+' '+g.days+' days in a row';
+    const lv=(g.levels||[]).length;
+    if(lv){const b=document.createElement('em');b.className='glv';b.textContent='Level '+(lv+1);tt.appendChild(b);}
     const gr=document.createElement('span');gr.className='gr';gr.textContent=Math.min(e.progress,e.target)+' / '+e.target;
     t.append(tt,gr);c.appendChild(t);
     const s=document.createElement('div');s.className='gs';
@@ -226,6 +231,9 @@ function drawGoals(){
       if(e.resetOn&&e.resetOn>=addDays(today,-2)&&!e.miss){const rd=fromIso(e.resetOn);s.append(' · started again '+DOW[rd.getDay()]+' '+rd.getDate());}
     }
     c.appendChild(s);
+    // Rewards already earned on this goal, one line per level.
+    (g.levels||[]).forEach((l,i)=>{const tr=document.createElement('div');tr.className='gtro';
+      tr.textContent='🏆 Level '+(i+1)+' · '+l.days+' days · '+(l.reward||'—')+(l.claimed?' ✓':'');c.appendChild(tr);});
     const pips=document.createElement('div');pips.className='gpips';
     for(let i=0;i<e.target;i++){const d=addDays(e.start,i),p=document.createElement('span');
       const dd=fromIso(d);p.textContent=DOW[dd.getDay()];
@@ -247,14 +255,43 @@ function drawGoals(){
     const f=document.createElement('div');f.className='gfoot';
     if(e.won&&!g.claimed){const cl=document.createElement('button');cl.type='button';cl.className='flink';cl.style.marginRight='14px';cl.textContent='Claim reward';
       cl.onclick=async()=>{await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{claimed:true})));render();};f.appendChild(cl);}
-    if(!e.won){const ec=document.createElement('button');ec.type='button';ec.className='flink';ec.style.marginRight='14px';
-      ec.textContent='Edit goal';ec.onclick=()=>newGoal(g);f.appendChild(ec);}
+    if(e.won){const lu=document.createElement('button');lu.type='button';lu.className='glvup';lu.textContent='⬆ Level up';
+      lu.onclick=()=>levelUp(g,e);f.prepend(lu);}
+    const ec=document.createElement('button');ec.type='button';ec.className='flink';ec.style.marginRight='14px';
+    ec.textContent='Edit goal';ec.onclick=()=>newGoal(g);f.appendChild(ec);
     const rm=document.createElement('button');rm.type='button';rm.className='flink';rm.textContent=e.won?'Remove':'Remove goal';
     rm.onclick=async()=>{if(!e.won&&!confirm('Remove this goal?'))return;await setSetting('goal:'+g.id,'');render();};
     f.appendChild(rm);c.appendChild(f);
     host.appendChild(c);
   });
   if(gs.length<MAX_GOALS){const b=document.createElement('button');b.type='button';b.className='gnew';b.textContent='＋ Set a goal with a reward';b.onclick=()=>newGoal();host.appendChild(b);}
+}
+// Level up a reached goal: more days and a new reward. The streak carries on (the days
+// already done still count) and the reward just earned is kept as a trophy line.
+function levelUp(g,e){
+  let n=g.days+7;
+  const body=document.createElement('div');
+  const lab=t=>{const p=document.createElement('p');p.className='clbl';p.textContent=t;return p;};
+  const opts=[...new Set([g.days+7,21,30,40,60,100])].filter(v=>v>g.days).sort((a,b)=>a-b).slice(0,5);
+  const w=document.createElement('div');w.className='chips';
+  const hint=document.createElement('p');hint.className='fhint';
+  const extra=e.target-g.days;                       // the made-up day keeps the goal one day longer
+  const setHint=()=>{const tot=n+extra,left=Math.max(0,tot-e.progress);
+    hint.textContent='Your streak carries on: '+e.progress+' day'+(e.progress>1?'s':'')+' already done. '+
+      (extra?'With your made-up day the goal is '+tot+' days, so ':'')+left+' more day'+(left!==1?'s':'')+' to go.';};
+  opts.forEach(v=>{const b=document.createElement('button');b.type='button';b.textContent=v+' days';b.classList.toggle('on',v===n);
+    b.onclick=()=>{w.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');n=v;setHint();};w.appendChild(b);});
+  const reward=document.createElement('input');reward.className='cin';reward.maxLength=100;reward.placeholder='e.g. Buffet with wifey 🍽️';
+  const was=document.createElement('p');was.className='fhint';
+  was.textContent='🏆 Level '+((g.levels||[]).length+1)+' done: '+g.days+' days · '+(g.reward||'—')+'. It stays on the card.';
+  body.append(lab('New goal'),w,hint,lab('New reward'),reward,was);
+  setHint();
+  openSheet('Level up · '+label(g.key),body,async()=>{
+    if(!reward.value.trim())return 'Add the new reward.';
+    const levels=(g.levels||[]).concat({days:g.days,reward:g.reward||'',claimed:!!g.claimed,won:e.won});
+    await setSetting('goal:'+g.id,JSON.stringify(Object.assign({},g,{days:n,reward:reward.value.trim(),claimed:false,levels})));
+  });
+  setTimeout(()=>reward.focus(),50);
 }
 // Change what the compensation for a missed day is, e.g. "2 solat hajat".
 function editComp(g){
