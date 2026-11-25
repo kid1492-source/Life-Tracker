@@ -1656,10 +1656,10 @@ saveBtn.onclick=async()=>{
 // copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
 // Four boxes, sorted by the kind of time a task needs. "This week" tasks get a deadline
 // (the Sunday of the week they were added, or a day picked).
-const TASK_COLS=[['deep','Deep work','30+ min, no interruptions'],['quick','Quick wins','5–10 min'],['plan','This week','Important · finish by Sunday'],['pocket','Pocket','Spare moments']];
+const TASK_COLS=[['deep','Deep work','30+ min, no interruptions'],['quick','Quick wins','5–10 min'],['plan','Important, but not urgent','Not necessarily today · due by Sunday'],['pocket','Pocket','Spare moments']];
 // Every task list of a day: the MIT list (its own card, max 3) and the four boxes.
 const TASK_LISTS=[['mit','MIT','']].concat(TASK_COLS);
-const BOX_SHORT={deep:'Deep',quick:'Quick',plan:'This week',pocket:'Pocket'};
+const BOX_SHORT={deep:'Deep',quick:'Quick',plan:'Not urgent',pocket:'Pocket'};
 const sundayOf=iso=>isoAdd(iso,(7-isoDate(iso).getDay())%7);
 // "4 days left" / "Due today" / "⚠ Overdue 23 Nov"
 function dueText(on,long){const t0=todayIso();
