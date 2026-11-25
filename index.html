@@ -277,6 +277,11 @@
   .tbox .nm{font-size:15px;font-weight:800;letter-spacing:-.01em;}
   .tbox.deep .nm{font-size:17px;}
   .tbox .bn{font-family:'Fraunces',serif;font-size:15px;font-weight:700;}
+  .tgrip{flex:none;align-self:stretch;display:flex;align-items:center;justify-content:center;width:26px;margin:-7px -5px -7px 0;color:#5E5C55;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
+  .tgrip svg{width:10px;height:16px;fill:currentColor;}
+  .ti.drag{position:relative;z-index:5;background:#3A3936;box-shadow:0 8px 22px rgba(0,0,0,.45),inset 0 0 0 1px var(--qc);border-radius:8px;transition:none;}
+  .ti.drag .tgrip{color:var(--qc);cursor:grabbing;}
+  .tbox.sorting .ti:not(.drag){transition:transform .12s;}
   .tage{font-size:11.5px;font-weight:700;color:#7FB2E5;}
   .tage.today{color:#F2C14E;}.tage.late{color:#F07070;}
   .tbox .btm{color:#D9A15C;font-weight:700;}
@@ -1849,6 +1854,10 @@ function boxItem(c,it){
     m.forEach(([k,v])=>{const sp=document.createElement('span');sp.className=k;sp.textContent=v;mt.appendChild(sp);});body.appendChild(mt);}
   body.onclick=()=>openEdit(c,it.id);
   r.appendChild(body);
+  const g=document.createElement('span');g.className='tgrip';g.setAttribute('aria-label','Drag to reorder');g.title='Drag to reorder';
+  g.innerHTML='<svg viewBox="0 0 10 16"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+  g.addEventListener('pointerdown',e=>taskDrag(e,c,r));
+  r.appendChild(g);
   return r;
 }
 // MIT card: the tasks that decide the day. They stay in their boxes too (marked 🎯).
@@ -1870,12 +1879,47 @@ function mitCard(T){
     add.textContent='+ Add MIT'+(ms.length?' ('+(MIT_MAX-ms.length)+' left)':'');add.onclick=()=>addTask('mit',null);cd.appendChild(add);}
   return cd;
 }
+// Drag a task by its handle (⠿) to reorder it inside its box: top = most important.
+let dragging=false;
+function taskDrag(e,c,el){
+  if(e.button>0)return;e.preventDefault();
+  const box=el.parentNode,grip=e.currentTarget;grip.setPointerCapture(e.pointerId);
+  dragging=true;el.classList.add('drag');box.classList.add('sorting');
+  let y=e.clientY,shift=0,raf=0;
+  const natural=()=>el.getBoundingClientRect().top-shift;
+  const grab=e.clientY-natural();
+  const place=()=>{
+    const items=[...box.querySelectorAll('.ti')].filter(x=>x!==el);
+    let before=null;
+    for(const x of items){const r=x.getBoundingClientRect();if(y<r.top+r.height/2){before=x;break;}}
+    const tail=box.querySelector('.tbmore,.tbadd');
+    const target=before||(items.length?items[items.length-1].nextSibling:tail);
+    if(target!==el&&target!==el.nextSibling)box.insertBefore(el,target);
+    shift=0;el.style.transform='';shift=y-grab-natural();el.style.transform='translateY('+shift+'px)';
+  };
+  const edge=()=>{const v=window.innerHeight,m=70;let d=0;
+    if(y<m)d=-Math.ceil((m-y)/6);else if(y>v-m-60)d=Math.ceil((y-(v-m-60))/6);
+    if(d){window.scrollBy(0,d);place();}raf=requestAnimationFrame(edge);};
+  raf=requestAnimationFrame(edge);
+  const move=ev=>{y=ev.clientY;place();};
+  const up=()=>{
+    cancelAnimationFrame(raf);grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);
+    el.style.transform='';el.classList.remove('drag');box.classList.remove('sorting');dragging=false;
+    const ids=[...box.querySelectorAll('.ti')].map(x=>x.dataset.tid);
+    const T=dayTasks(dayObj(sel)),cur=T[c];
+    const next=ids.map(id=>cur.find(x=>x.id===id)).filter(Boolean).concat(cur.filter(x=>!ids.includes(x.id)));
+    if(next.some((x,i)=>x!==cur[i])){T[c]=next;save();}
+    renderTasks(true);
+  };
+  grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);
+}
 function renderTasks(force){
   const key=storeKey()+':'+sel;
   if(taskShown!==key){taskShown=key;taskPal='';taskRep='';taskEdit=null;carryTasks();}
   const sig=taskSigNow();
   if(!force&&sig===taskSig)return;
   if(!force&&taskGrid.contains(document.activeElement))return; // don't redraw while typing
+  if(dragging)return;
   taskSig=sig;
   const o=days[sel],T=(o&&o.tasks)||{};
   if(taskEdit&&!(Array.isArray(T[taskEdit.c])&&T[taskEdit.c].some(x=>x.id===taskEdit.id)))taskEdit=null;
@@ -1890,7 +1934,7 @@ function renderTasks(force){
     let list=(Array.isArray(T[c])?T[c]:[]).filter(x=>String(x.t||'').trim()||(taskEdit&&taskEdit.id===x.id));
     const open=list.filter(x=>!x.d&&!x.sk).length;
     // Unfinished first; Schedule by date.
-    list=list.slice().sort((a,b)=>(!!a.d-!!b.d)||(c==='plan'?(taskBorn(a)||9e15)-(taskBorn(b)||9e15):0));
+    list=list.slice().sort((a,b)=>(!!a.d-!!b.d));
     const bx=document.createElement('div');bx.className='tbox '+c;bx.dataset.c=c;
     const hd=document.createElement('div');hd.className='bh';
     hd.innerHTML='<div class="bt"><span class="nm"></span><span class="bn"></span></div><small><span class="sb"></span><b class="btm"></b></small>';
