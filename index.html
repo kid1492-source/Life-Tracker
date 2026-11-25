@@ -818,6 +818,21 @@ async function pushDay({mk,d,diff}){
   const baseDay=norm(readBase(mk).days[d]);
   const sent=Object.assign({},server);
   Object.keys(diff).forEach(f=>{sent[f]=mergeField(server[f],baseDay[f],diff[f]);});
+  // Safety: tasks are removed one at a time. If one upload would remove 3 or more tasks that
+  // are saved, this device's copy is out of date (an old tab or phone): keep the saved tasks.
+  if('tasks' in diff&&server.tasks&&typeof server.tasks==='object'){
+    const T=sent.tasks&&typeof sent.tasks==='object'?sent.tasks:{},ids=new Set();
+    Object.keys(T).forEach(c=>{if(Array.isArray(T[c]))T[c].forEach(x=>x&&ids.add(x.id));});
+    const gone=[];
+    Object.keys(server.tasks).forEach(c=>{if(Array.isArray(server.tasks[c]))server.tasks[c].forEach((x,i)=>{
+      if(x&&x.id&&String(x.t||'').trim()&&!ids.has(x.id))gone.push([c,i,x]);});});
+    if(gone.length>=3){
+      const keep=Object.assign({},T);
+      gone.forEach(([c,i,x])=>{const l=Array.isArray(keep[c])?keep[c].slice():[];l.splice(Math.min(i,l.length),0,x);keep[c]=l;});
+      sent.tasks=keep;
+      addNotice(day,'kept '+gone.length+' saved tasks this device was about to remove (its copy was out of date)');
+    }
+  }
   const {data:saved,error:e2}=await sb.from('tracker_days')
     .upsert({user_id:user.id,day,data:sent},{onConflict:'user_id,day'}).select('data').single();
   if(e2) throw e2;
@@ -1083,6 +1098,7 @@ async function gatedSync(){
     await pull();lastError='';
   }catch(e){ok=false;lastError=(e&&e.message)||String(e);}
   refresh();setStatus();
+  if(ok)afterPull();
   if(ok)gateHide();else gateShow('fail');
   flush();
 }
@@ -1106,6 +1122,9 @@ async function restoreDay(day,data){
   refresh();setStatus();
 }
 
+// After a download: reload the screen from the device copy, then allow carry-over.
+function afterPull(){if(typeof window.trackerAfterPull==='function')window.trackerAfterPull();}
+let pulledOk=false;
 async function onSignedIn(){
   gateShow('busy');
   try{
@@ -1115,11 +1134,13 @@ async function onSignedIn(){
     if(a.conflicts.length) addNotice('account','kept the cloud value for '+a.conflicts.length+' field(s) that were set differently on this device (backup kept on this device): '+a.conflicts.slice(0,3).join(', '));
     lastError='';
     gateHide();
+    pulledOk=true;
   }catch(e){
     lastError=(e&&e.message)||String(e);
     gateShow('fail');
   }
   refresh();
+  if(pulledOk){pulledOk=false;afterPull();}
   await flush();
   setStatus();
 }
@@ -1129,13 +1150,15 @@ async function syncNow(){
     try{ await window.trackerBeforePull(); }catch(e){}
   }
   if(!user){setStatus();return;}
+  let ok=true;
   try{
     await pull();
     lastError='';
   }catch(e){
-    lastError=(e&&e.message)||String(e);
+    ok=false;lastError=(e&&e.message)||String(e);
   }
   refresh();
+  if(ok)afterPull();
   await flush();
   setStatus();
 }
@@ -1247,6 +1270,7 @@ window.trackerPlan={
 
 window.trackerSync={
   signedIn:()=>!!user,
+  mergeField,
   history:dayHistory,
   restoreDay,
   canon,
@@ -1279,7 +1303,7 @@ sb.auth.onAuthStateChange(async(ev,session)=>{
 });
 
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){hiddenAt=Date.now();flush();return;}
+  if(document.hidden){hiddenAt=Date.now();if(typeof window.trackerHidden==='function')window.trackerHidden();flush();return;}
   if(user&&hiddenAt&&Date.now()-hiddenAt>=20000) gatedSync(); else syncNow();
 });
 window.addEventListener('online',()=>syncNow());
@@ -1371,7 +1395,36 @@ function renderPeriodBadges(){
 // and call trackerRefresh, without an older screen copy being written back over it.
 let savedTimer;
 function showSaved(){const m=document.getElementById('savedMsg');m.classList.add('show');clearTimeout(savedTimer);savedTimer=setTimeout(()=>m.classList.remove('show'),1100);}
-async function persist(){return window.storage.set(storeKey(),JSON.stringify({days,review}));}
+// What the device copy held when this screen last loaded or saved it. Only the fields changed
+// on this screen since then are written; everything else keeps the device copy, so an old tab
+// (or a phone left in the background for days) can't write its old copy back over newer data.
+let snapRaw=null,snapKey='';
+const sameJ=(a,b)=>JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);
+async function persist(){
+  const k=storeKey();let cur=null,curRaw=null;
+  try{const r=await window.storage.get(k);curRaw=r&&r.value?r.value:null;cur=curRaw?JSON.parse(curRaw):null;}catch(e){}
+  let out={days,review};
+  if(cur&&cur.days&&snapKey===k&&curRaw!==snapRaw){
+    const S=(snapRaw?JSON.parse(snapRaw):null)||{days:{},review:{weekly:{},monthly:''}},SD=S.days||{};
+    const M=(window.trackerSync&&window.trackerSync.mergeField)||((c,b,l)=>l);
+    const nd=Object.assign({},cur.days);
+    Object.keys(days).forEach(d=>{
+      const m=days[d],b=SD[d],c=cur.days[d];
+      if(sameJ(m,b))return;                              // not changed on this screen
+      if(!c||sameJ(c,b)){nd[d]=m;return;}               // device copy untouched: take this screen's
+      const o=Object.assign({},c);
+      Object.keys(Object.assign({},m,b)).forEach(f=>{if(!sameJ(m&&m[f],b&&b[f]))o[f]=M(c[f],b&&b[f],m&&m[f]);});
+      nd[d]=o;
+    });
+    const cr=Object.assign({weekly:{},monthly:''},cur.review),sr=Object.assign({weekly:{},monthly:''},S.review),w=Object.assign({},cr.weekly||{});
+    Object.keys(review.weekly||{}).forEach(x=>{if(!sameJ(review.weekly[x],(sr.weekly||{})[x]))w[x]=review.weekly[x];});
+    out={days:nd,review:{weekly:w,monthly:sameJ(review.monthly,sr.monthly)?cr.monthly:review.monthly}};
+    days=out.days;review=out.review;                     // the screen now shows the merged copy
+    setTimeout(()=>{try{render();}catch(e){}},0);
+  }
+  const v=JSON.stringify(out);
+  await window.storage.set(k,v);snapRaw=v;snapKey=k;
+}
 window.trackerBeforePull=()=>persist();
 function scheduleSave(){try{persist();showSaved();}catch(e){}}
 async function flush(){try{await persist();}catch(e){}}
@@ -1379,6 +1432,7 @@ function save(){render();scheduleSave();}
 async function loadData(){
   let d={},rv={weekly:{},monthly:''};
   try{const r=await window.storage.get(storeKey());
+    snapRaw=r&&r.value?r.value:null;snapKey=storeKey();
     if(r&&r.value){const p=JSON.parse(r.value);
       if(p&&typeof p==='object'&&p.days){d=p.days;rv=Object.assign({weekly:{},monthly:''},p.review||{});if(!rv.weekly)rv.weekly={};}
       else{d=p||{};}}
@@ -2023,6 +2077,10 @@ async function carryTasks(){
       if(p.tasks.carried)break;                                    // that day already holds older carries
     }
     if(year!==y0||month0!==m0)return;                              // month changed while reading
+    // The device copy may be newer than this screen (another tab, or a download): if today
+    // there already has tasks carried over, show that instead of carrying again.
+    try{const r=await window.storage.get(storeKey()),p=r&&r.value?JSON.parse(r.value):null,dt=p&&p.days&&p.days[td];
+      if(dt&&dt.tasks&&dt.tasks.carried&&!(days[td]&&days[td].tasks&&days[td].tasks.carried)){await loadData();render();return;}}catch(e){}
     const o=dayObj(td);
     if(o.tasks&&o.tasks.carried)return;
     const any=TASK_LISTS.some(([c])=>take[c].length);
@@ -2038,7 +2096,11 @@ async function carryTasks(){
 const baseTaskRender=render;
 render=function(){baseTaskRender();renderTasks();};
 const baseTaskRefresh=window.trackerRefresh;
-window.trackerRefresh=async function(){await baseTaskRefresh();carryReady=true;carryTasks();};
+window.trackerRefresh=async function(){await baseTaskRefresh();carryTasks();};
+// Carry-over runs only on data fresh from the cloud: after a download, never on a screen copy
+// that may be days old (a tab left in the background). Leaving the app turns it off again.
+window.trackerAfterPull=async function(){await baseTaskRefresh();carryReady=true;carryTasks();};
+window.trackerHidden=function(){if(window.trackerSync&&window.trackerSync.signedIn())carryReady=false;};
 // Signed out (or sign-in never resolves): carry from the device copy.
 setTimeout(()=>{if(!carryReady&&!(window.trackerSync&&window.trackerSync.signedIn())){carryReady=true;carryTasks();}},4000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(carryTasks,1500);});
