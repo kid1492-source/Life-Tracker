@@ -277,6 +277,8 @@
   .tbox .nm{font-size:15px;font-weight:800;letter-spacing:-.01em;}
   .tbox.deep .nm{font-size:17px;}
   .tbox .bn{font-family:'Fraunces',serif;font-size:15px;font-weight:700;}
+  .tage{font-size:11.5px;font-weight:700;color:#7FB2E5;}
+  .tage.today{color:#F2C14E;}.tage.late{color:#F07070;}
   .tbox .btm{color:#D9A15C;font-weight:700;}
   .tmove{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 12px 12px 46px;}
   .tmove span{font-size:11.5px;font-weight:600;color:var(--muted);margin-right:2px;}
@@ -1654,20 +1656,19 @@ saveBtn.onclick=async()=>{
 // r = repeats daily {s,u}, sk = skipped today. A day with no tasks
 // field was never set up. When today is opened, unfinished tasks from earlier days are
 // copied to the top of today once ("carried": 1), so a task deleted today stays deleted.
-// Four boxes, sorted by the kind of time a task needs. "This week" tasks get a deadline
-// (the Sunday of the week they were added, or a day picked).
-const TASK_COLS=[['deep','Deep work','30+ min, no interruptions'],['quick','Quick wins','5–10 min'],['plan','Important, but not urgent','Not necessarily today · due by Sunday'],['pocket','Pocket','Spare moments']];
+// Four boxes, sorted by the kind of time a task needs. "Important, but not urgent" tasks
+// show how long ago they were written.
+const TASK_COLS=[['deep','Deep work','30+ min, no interruptions'],['quick','Quick wins','5–10 min'],['plan','Important, but not urgent','Must get done, not necessarily today'],['pocket','Pocket','Spare moments']];
 // Every task list of a day: the MIT list (its own card, max 3) and the four boxes.
 const TASK_LISTS=[['mit','MIT','']].concat(TASK_COLS);
 const BOX_SHORT={deep:'Deep',quick:'Quick',plan:'Not urgent',pocket:'Pocket'};
-const sundayOf=iso=>isoAdd(iso,(7-isoDate(iso).getDay())%7);
-// "4 days left" / "Due today" / "⚠ Overdue 23 Nov"
-function dueText(on,long){const t0=todayIso();
-  if(on<t0)return '⚠ Overdue'+(long?' · ':' ')+fmtIso(on).replace(/^\S+ /,'');
-  if(on===t0)return 'Due today';
-  const n=Math.round((isoDate(on)-isoDate(t0))/864e5);
-  return n===1?'Due tomorrow':n+' days left';}
-const dueCls=on=>{const t0=todayIso();return on<t0?'late':on===t0?'today':'day';};
+// When a task was written: its id starts with the time it was made (kept when carried over).
+function taskBorn(it){if(it&&it.at)return it.at;const n=parseInt(String(it&&it.id||'').slice(0,-5),36);
+  return n>1.5e12&&n<Date.now()+864e5?n:null;}
+function taskAge(it){const b=taskBorn(it);if(!b)return null;
+  const a=new Date(b);a.setHours(0,0,0,0);const t=new Date();t.setHours(0,0,0,0);return Math.max(0,Math.round((t-a)/864e5));}
+const ageText=n=>n===0?'Written today':n===1?'Written yesterday':'Written '+n+' days ago';
+const ageCls=n=>n>=14?'late':n>=7?'today':'day';   // amber after a week, red after two
 const MIT_MAX=3;   // most important tasks of the day: finish them all and the day is won
 const openTask=x=>x&&!x.d&&!x.sk&&String(x.t||'').trim();
 const todayIso=()=>isoOf(REAL.getFullYear(),REAL.getMonth(),REAL.getDate());
@@ -1679,7 +1680,7 @@ const mitCount=T=>mitList(T).filter(x=>x&&!x.sk).length;
 function moveTask(c,id,to){
   const T=dayTasks(dayObj(sel)),x=T[c].find(y=>y.id===id);if(!x||to===c)return;
   T[c]=T[c].filter(y=>y.id!==id);
-  if(to==='plan'){if(!x.on)x.on=sundayOf(todayIso());}else delete x.on;
+  delete x.on;
   T[to].push(x);
   if(taskEdit&&taskEdit.id===id)taskEdit.c=to;
   save();renderTasks(true);
@@ -1695,7 +1696,7 @@ function focusTask(id){const el=taskGrid.querySelector('.trow[data-id="'+id+'"] 
 function addTask(c,afterId){
   const T=dayTasks(dayObj(sel)),list=T[c];
   if(c==='mit'&&mitCount(T)>=MIT_MAX){taskFlash('','Only '+MIT_MAX+' MITs a day. Finish or remove one first.');return;}
-  const it={id:newTaskId(),t:'',d:0};if(c==='plan')it.on=sundayOf(selIso());
+  const it={id:newTaskId(),t:'',d:0};
   const i=afterId?list.findIndex(x=>x.id===afterId):-1;
   if(i>=0)list.splice(i+1,0,it);else list.push(it);
   taskEdit=c==='mit'?null:{c,id:it.id};taskPal='';taskRep='';
@@ -1765,14 +1766,8 @@ function taskRow(c,it){
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(inp.value.trim())addTask(c,it.id);else inp.blur();}};
   if(it.k&&!it.d)inp.style.color=it.k;
   main.appendChild(inp);main.appendChild(meta);
-  if(c==='plan'){                                   // This week: deadline, tap to change
-    const on=it.on||sundayOf(todayIso()),dc=document.createElement('label');
-    dc.className='tday'+(on<todayIso()?' late':on===todayIso()?' today':'');
-    const sp=document.createElement('span');
-    sp.textContent=on<todayIso()?dueText(on,1):'📅 Due '+fmtIso(on)+(on===todayIso()?' (today)':'');
-    const di=document.createElement('input');di.type='date';di.value=on;di.setAttribute('aria-label','Deadline');
-    di.onchange=()=>{const x=findTask(c,it.id);if(!x)return;x.on=di.value||sundayOf(todayIso());save();renderTasks(true);};
-    dc.append(sp,di);meta.appendChild(dc);
+  if(c==='plan'){                                   // how long ago it was written
+    const n=taskAge(it);if(n!=null){const ag=document.createElement('span');ag.className='tage '+ageCls(n);ag.textContent=ageText(n);meta.appendChild(ag);}
   }
   // Expected time, e.g. 30m or 1h 30m. Typed as 30, 30m, 1h, 1.5h, 1h30 or 1:30.
   const est=document.createElement('span');est.className='test';
@@ -1846,7 +1841,7 @@ function boxItem(c,it){
   if(it.k&&!it.d)tx.style.color=it.k;
   body.appendChild(tx);
   const m=[];
-  if(c==='plan'&&it.on&&!it.d)m.push([dueCls(it.on),dueText(it.on)]);
+  if(c==='plan'&&!it.d){const n=taskAge(it);if(n!=null)m.push([ageCls(n),ageText(n)]);}
   if(it.e)m.push(['tm',it.e]);
   if(it.r)m.push(['rp','↻']);
   if(it.sk)m.push(['sk','skipped']);
@@ -1888,8 +1883,6 @@ function renderTasks(force){
   if(o&&o.tasks){let f=0;TASK_COLS.forEach(([c])=>{const l=Array.isArray(T[c])?T[c]:[];
     l.filter(x=>x&&x.m).forEach(x=>{delete x.m;if(mitCount(dayTasks(o))<MIT_MAX){T[c]=T[c].filter(y=>y!==x);delete x.on;T.mit.push(x);}f=1;});});
     if(f)scheduleSave();}
-  // This week tasks without a deadline (made before deadlines existed) get this Sunday.
-  if(selIso()===todayIso()&&Array.isArray(T.plan)){let f=0;T.plan.forEach(x=>{if(x&&!x.on){x.on=sundayOf(todayIso());f=1;}});if(f)scheduleSave();}
   taskGrid.innerHTML='';
   taskGrid.appendChild(mitCard(T));
   const mx=document.createElement('div');mx.className='tmx';
@@ -1897,7 +1890,7 @@ function renderTasks(force){
     let list=(Array.isArray(T[c])?T[c]:[]).filter(x=>String(x.t||'').trim()||(taskEdit&&taskEdit.id===x.id));
     const open=list.filter(x=>!x.d&&!x.sk).length;
     // Unfinished first; Schedule by date.
-    list=list.slice().sort((a,b)=>(!!a.d-!!b.d)||(c==='plan'?((a.on||'9')<(b.on||'9')?-1:(a.on||'9')>(b.on||'9')?1:0):0));
+    list=list.slice().sort((a,b)=>(!!a.d-!!b.d)||(c==='plan'?(taskBorn(a)||9e15)-(taskBorn(b)||9e15):0));
     const bx=document.createElement('div');bx.className='tbox '+c;bx.dataset.c=c;
     const hd=document.createElement('div');hd.className='bh';
     hd.innerHTML='<div class="bt"><span class="nm"></span><span class="bn"></span></div><small><span class="sb"></span><b class="btm"></b></small>';
@@ -1980,8 +1973,8 @@ async function carryTasks(){
       if(!p||!p.tasks)continue;
       TASK_LISTS.forEach(([c])=>(p.tasks[c]||[]).forEach(it=>{
         if(!it||!it.id||seen.has(it.id))return;seen.add(it.id);    // newest copy of each task wins
-        if(it.r){if(tIso<=it.r.u&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,r:it.r},it.k?{k:it.k}:{},it.e?{e:it.e}:{},it.on?{on:it.on}:{}));return;}
-        if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{},it.e?{e:it.e}:{},it.on?{on:it.on}:{}));
+        if(it.r){if(tIso<=it.r.u&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,r:it.r},it.k?{k:it.k}:{},it.e?{e:it.e}:{}));return;}
+        if(!it.d&&String(it.t||'').trim())take[c].push(Object.assign({id:it.id,t:it.t,d:0,c:1},it.k?{k:it.k}:{},it.e?{e:it.e}:{}));
       }));
       if(p.tasks.carried)break;                                    // that day already holds older carries
     }
