@@ -104,6 +104,34 @@ css.textContent=`
 #calNoteSec .rt-ed{min-height:80px;background:var(--card);}
 .cnote-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:6px 2px 0;}
 .cc .npen{font-size:9px;color:var(--muted);text-align:center;line-height:1;margin-top:auto;}
+.cseg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 14px;}
+.cseg button{flex:1;border:0;background:none;color:var(--muted);font:700 13px 'Inter',sans-serif;padding:8px 0;border-radius:9px;cursor:pointer;}
+.cseg button.on{background:#3A3935;color:var(--ink);}
+.cwh{display:flex;align-items:center;gap:8px;margin:0 2px 12px;}
+.cwh .t{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:#D9A15C;line-height:1.15;}
+.cwh .s{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+.cwh .nav{margin-left:auto;display:flex;gap:6px;flex:none;}
+.cwk{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:20px;}
+body.calmode.weekwide .wrap{max-width:1160px;}
+body.calmode.weekwide .cwk{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-items:start;}
+.cwcol{display:grid;gap:12px;min-width:0;}
+.cwd{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px 12px;min-width:0;}
+.cwd.today{border-color:var(--pine);box-shadow:inset 0 0 0 1px var(--pine);}
+.cwd .hd{display:flex;align-items:flex-end;gap:10px;padding-bottom:8px;border-bottom:1.5px solid #4A4942;cursor:pointer;}
+.cwd .num{font-family:'Fraunces',serif;font-size:34px;font-weight:600;line-height:.9;color:var(--ink);}
+.cwd.today .num{color:var(--pine);}
+.cwd.past .num{color:#D9A15C;}
+.cwd .dn{font-size:15px;font-weight:600;line-height:1.2;}
+.cwd .dn small{display:block;font-size:11px;color:var(--muted);font-weight:500;}
+.cwd .hj{margin-left:auto;text-align:right;font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.3;}
+.cwd .hj b{display:block;color:var(--ink);font-size:13px;font-weight:600;}
+.cwd .wnote{margin-top:10px;font-size:13px;line-height:1.45;color:var(--ink);cursor:pointer;overflow-wrap:anywhere;}
+.cwd .wnote ul,.cwd .wnote ol{margin:2px 0;padding-left:18px;}
+.cwd .wnote p{margin:0 0 4px;}
+.cwd .wnone{margin-top:8px;font-size:12.5px;color:#6E6C64;font-style:italic;}
+.cwd .wmood{margin-top:9px;font-size:12.5px;font-weight:700;color:#D9A15C;}
+.cwd .wmood+.wnote{margin-top:4px;}
+.cwd .wnote{font-size:14px;line-height:1.5;}
 .cc .cwon{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:#6CCB73;}
 .cnoteprev{padding:10px 14px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.45;color:var(--ink);cursor:pointer;max-height:6.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent);}
 .cnoteprev ul,.cnoteprev ol{margin:2px 0;padding-left:18px;}
@@ -115,6 +143,12 @@ document.head.appendChild(css);
 const view=document.createElement('div');
 view.id='calview';
 view.innerHTML=`
+<div class="cseg" id="calSeg"><button type="button" data-m="month">Month</button><button type="button" data-m="week">Week</button><button type="button" data-m="day">Day</button></div>
+<div id="calWeek">
+  <div class="cwh"><div><div class="t" id="cwTitle"></div><div class="s" id="cwSub"></div></div>
+    <span class="nav"><button type="button" class="cbtn" id="cwToday">This week</button><button type="button" class="cbtn" id="cwPrev" aria-label="Previous week">‹</button><button type="button" class="cbtn" id="cwNext" aria-label="Next week">›</button></span></div>
+  <div class="cwk" id="cwGrid"></div>
+</div>
 <div id="calMonth">
   <div class="card cmg"><div class="wd"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="cgrid" id="calGrid"></div></div>
   <div class="sec-label"><span class="dot"></span><h2 id="calSelTitle"></h2><button type="button" class="clink" id="calOpen">Open day ›</button></div>
@@ -135,7 +169,7 @@ view.innerHTML=`
 </div>`;
 const wrap=document.querySelector('.wrap');
 wrap.insertBefore(view,document.getElementById('tip'));
-const dayEl=view.querySelector('#calDay'), monthEl=view.querySelector('#calMonth');
+const dayEl=view.querySelector('#calDay'), monthEl=view.querySelector('#calMonth'), weekEl=view.querySelector('#calWeek');
 
 // The Task section moves from Track to the Calendar day view (same lists, same data).
 const taskSec=document.getElementById('taskSec');
@@ -281,6 +315,56 @@ function renderDay(list){
   if(!nowShown)nowLine();
 }
 
+// ---------- week view: Monday to Sunday, laid out like a paper diary ----------
+const HIJRI=(()=>{try{return new Intl.DateTimeFormat('en-GB-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric'});}catch(e){return null;}})();
+const hijri=d=>{if(!HIJRI)return '';try{return HIJRI.format(d).replace(/\s*AH$/,'');}catch(e){return '';}};
+const MALAY=['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
+const DAYNAME=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7);}
+const weekStart=()=>{const d=new Date(year,month0,sel);d.setDate(d.getDate()-((d.getDay()+6)%7));return d;};
+let weekTok=0;
+async function renderWeek(list){
+  const tok=++weekTok,ws=weekStart(),we=new Date(ws);we.setDate(ws.getDate()+6);
+  const M3=m=>MONTHS[m].slice(0,3);
+  $('cwTitle').textContent=ws.getDate()+(ws.getMonth()!==we.getMonth()?' '+M3(ws.getMonth()):'')+' – '+we.getDate()+' '+M3(we.getMonth())+' '+we.getFullYear();
+  $('cwSub').textContent='Week '+isoWeek(ws)+' · Daily reviews';
+  const dates=[...Array(7)].map((_,i)=>{const d=new Date(ws);d.setDate(ws.getDate()+i);return d;});
+  const months={};
+  for(const d of dates){const k=d.getFullYear()+'-'+d.getMonth();if(!(k in months))months[k]=await readMonthDays(d.getFullYear(),d.getMonth());}
+  if(tok!==weekTok)return;
+  const g=$('cwGrid');g.innerHTML='';
+  // Tablet: Mon–Thu on the left, Fri–Sun on the right, like a paper diary.
+  const wide=document.body.classList.contains('weekwide'),cols=wide?[0,1].map(()=>{const x=document.createElement('div');x.className='cwcol';g.appendChild(x);return x;}):null;
+  const tIso=todayIso();
+  dates.forEach((d,i)=>{
+    const dIso=iso(d.getFullYear(),d.getMonth(),d.getDate()),o=(months[d.getFullYear()+'-'+d.getMonth()]||{})[d.getDate()]||{};
+    const c=document.createElement('div');c.className='cwd'+(dIso===tIso?' today':dIso<tIso?' past':'');
+    const hd=document.createElement('div');hd.className='hd';
+    hd.innerHTML='<span class="num"></span><span class="dn"></span><span class="hj"><b></b><span></span></span>';
+    hd.querySelector('.num').textContent=d.getDate();
+    hd.querySelector('.dn').textContent=DAYNAME[d.getDay()];
+    const sm=document.createElement('small');sm.textContent=dIso===tIso?'Today':M3(d.getMonth())+' '+d.getFullYear();hd.querySelector('.dn').appendChild(sm);
+    hd.querySelector('.hj b').textContent=MALAY[d.getDay()];hd.querySelector('.hj span').textContent=hijri(d);
+    hd.onclick=()=>openReview(d);
+    c.appendChild(hd);
+    // The day's Daily Review: mood and what was written.
+    const MOODS={1:'😞 Low',2:'😐 Okay',3:'🙂 Good',4:'😄 Great'};
+    if(MOODS[o.mood]){const md=document.createElement('div');md.className='wmood';md.textContent=MOODS[o.mood];c.appendChild(md);}
+    if(o.note&&rtText(o.note)){const n=document.createElement('div');n.className='wnote';n.innerHTML=rtHtml(o.note);n.onclick=()=>openReview(d);c.appendChild(n);}
+    else{const n=document.createElement('div');n.className='wnone';n.textContent=dIso>tIso?'':'Nothing written';c.appendChild(n);}
+    (cols?cols[i<4?0:1]:g).appendChild(c);
+  });
+}
+// Tapping a day opens it in Track at its Daily Review, where it is written and edited.
+async function openReview(d){await showDay(d.getFullYear(),d.getMonth(),d.getDate());mode='day';window.trackerSetView('track');render();
+  const r=document.getElementById('dayNote');if(r)setTimeout(()=>window.scrollTo({top:r.getBoundingClientRect().top+window.scrollY-120}),50);}
+$('cwPrev').onclick=()=>goDay(-7);
+$('cwNext').onclick=()=>goDay(7);
+$('cwToday').onclick=async()=>{await showDay(REAL.getFullYear(),REAL.getMonth(),REAL.getDate());render();};
+view.querySelectorAll('#calSeg button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;render();window.scrollTo(0,0);});
+window.addEventListener('resize',()=>{if(mode==='week'&&document.body.classList.contains('calmode'))renderCalendar();});
+
 // ---------- "Plan for tomorrow": Track → tomorrow in Calendar → Done ticks the habit ----------
 let planning=null; // {y,m0,d}: the day "Plan for tomorrow" belongs to
 function nextDay(y,m0,d){const t=new Date(y,m0,d+1);return {y:t.getFullYear(),m0:t.getMonth(),d:t.getDate()};}
@@ -324,7 +408,12 @@ render=function(){baseRenderC();drawPlanBtn();};
 function renderCalendar(){
   monthEl.style.display=mode==='month'?'':'none';
   dayEl.style.display=mode==='day'?'':'none';
+  weekEl.style.display=mode==='week'?'':'none';
+  document.body.classList.toggle('weekwide',mode==='week'&&document.body.classList.contains('calmode')&&window.innerWidth>=900);
+  view.querySelectorAll('#calSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
+  fab.style.visibility=mode==='week'?'hidden':'';
   const list=items();
+  if(mode==='week'){renderWeek(list);return;}
   if(mode==='month')renderMonth(list);
   else{renderDay(list);drawPlanBanner();
     // Task boxes size to their text, which can't be measured while the view is hidden.
