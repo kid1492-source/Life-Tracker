@@ -461,7 +461,7 @@
     <button class="navbtn" id="nextM">Next ›</button>
   </div>
 
-  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabCal" role="tab">Plan</button><button class="tab" id="tabDash" role="tab">Dashboard</button></div>
+  <div class="tabs" role="tablist"><button class="tab on" id="tabTrack" role="tab">Track</button><button class="tab" id="tabCal" role="tab">Plan</button><button class="tab" id="tabDash" role="tab">Dashboard</button><button class="tab" id="tabJournal" role="tab">Journal</button></div>
 
   <!-- Calendar -->
   <div class="cal">
@@ -2522,21 +2522,25 @@ function renderDashboard(){
 (function(){
   const wrap=document.querySelector('.wrap'),cal=wrap.querySelector('.cal'),dash=document.getElementById('dash');
   for(let el=cal;el&&el!==dash;el=el.nextElementSibling)el.classList.add('trackOnly');
-  const tabs={track:document.getElementById('tabTrack'),cal:document.getElementById('tabCal'),dash:document.getElementById('tabDash')};
+  const tabs={track:document.getElementById('tabTrack'),cal:document.getElementById('tabCal'),dash:document.getElementById('tabDash'),journal:document.getElementById('tabJournal')};
   function setView(v){
     document.body.classList.toggle('dashmode',v==='dash');
     document.body.classList.toggle('calmode',v==='cal');
+    document.body.classList.toggle('journalmode',v==='journal');
+    if(v!=='journal')document.body.classList.remove('jwide');
     Object.keys(tabs).forEach(k=>tabs[k].classList.toggle('on',k===v));
-    document.getElementById('saveBar').style.display=v==='dash'?'none':'';   // Sync now on Track and Plan
+    document.getElementById('saveBar').style.display=(v==='dash'||v==='journal')?'none':'';   // Sync now on Track and Plan
     try{localStorage.setItem('view',v);}catch(e){}
     if(v==='dash')renderDashboard();
     if(v==='cal'&&window.renderCalendar)window.renderCalendar();
+    if(v==='journal'&&window.renderJournal)window.renderJournal();
     window.scrollTo(0,0);}
   Object.keys(tabs).forEach(k=>{tabs[k].onclick=()=>setView(k);});
   window.trackerSetView=setView;
   const baseR=render;render=function(){baseR();
     if(document.body.classList.contains('dashmode'))renderDashboard();
-    if(document.body.classList.contains('calmode')&&window.renderCalendar)window.renderCalendar();};
+    if(document.body.classList.contains('calmode')&&window.renderCalendar)window.renderCalendar();
+    if(document.body.classList.contains('journalmode')&&window.renderJournal)window.renderJournal();};
 })();
 
 // New day while the app stayed open (phones keep it in the background): move "today" on.
@@ -2560,5 +2564,6 @@ loadMonth();
 <script src="calendar.js"></script>
 <script src="focus.js"></script>
 <script src="trading.js"></script>
+<script src="journal.js"></script>
 </body>
 </html>
